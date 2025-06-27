@@ -95,14 +95,14 @@ export class AuditService {
                 }
                 pageData.accessibilityDesktop = {
                     violations: desktopResult.violations.map(v => ({
-                        description: v.description,
-                        help: v.help
+                        issue: v.description,
+                        suggestion: v.help
                     }))
                 };
                 pageData.accessibilityMobile = {
                     violations: mobileResult.violations.map(v => ({
-                        description: v.description,
-                        help: v.help
+                        issue: v.description,
+                        suggestion: v.help
                     }))
                 };
             }

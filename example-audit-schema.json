@@ -1,5 +1,5 @@
 {
-  "auditId": "<auditId>",
+  "auditId": "test-audit-1234",
   "host": "example.com",
   "url": "https://example.com",
   "pages": {
@@ -19,32 +19,93 @@
     "isRobotsDoFollow": true,
     "hasViewportMetaTag": true,
     "canonical": "https://example.com",
-    "ctas": [],
-    "bodyText": "",
-    "textToHtmlRatio": 0.5,
+    "ctas": [
+      "Sign up",
+      "Learn more",
+      "Contact us"
+    ],
+    "bodyText": "This is an example body text for the test audit page. It contains several keywords and phrases for testing the word cloud and content analysis features.",
+    "textToHtmlRatio": 12.5,
     "headers": {
-      "h1": "Example H1",
-      "h2": "Example H2",
-      "h3": "Example H3",
-      "h4": "Example H3",
-      "h5": "Example H3",
-      "h6": "Example H3"
+      "h1": "Welcome to Example",
+      "h2": [
+        "Features",
+        "Pricing"
+      ],
+      "h3": [
+        "Why Choose Us",
+        "Testimonials"
+      ],
+      "h4": [
+        "FAQ"
+      ],
+      "h5": [],
+      "h6": []
     },
     "hasSingleH1": true,
     "screenshots": [
       {
-        "desktopUrl": "firestorage/<auditId>/desktop.png",
-        "annotatedDesktopUrl": "firestorage/<auditId>/annoated-desktop.png",
-        "annotatedMobileUrl": "firestorage/<auditId>/annoated-mobile.png"
+        "desktopUrl": "firestorage/test-audit-1234/desktop.png",
+        "annotatedDesktopUrl": "firestorage/test-audit-1234/annotated-desktop.png",
+        "annotatedMobileUrl": "firestorage/test-audit-1234/annotated-mobile.png"
+      }
+    ],
+    "wordCloudData": [
+      {
+        "text": "Example",
+        "size": 60
+      },
+      {
+        "text": "Test",
+        "size": 45
+      },
+      {
+        "text": "Audit",
+        "size": 30
+      },
+      {
+        "text": "Page",
+        "size": 20
+      },
+      {
+        "text": "Cloud",
+        "size": 15
       }
     ],
     "accessibilityDesktop": {
-      "violations": []
+      "violations": [
+        { "issue": "Image elements do not have [alt] attributes.", "suggestion": "Add alt text to all images." },
+        { "issue": "Form elements do not have associated labels.", "suggestion": "Add labels to all form fields." }
+      ]
     },
     "accessibilityMobile": {
-      "violations": []
+      "violations": [
+        { "issue": "Buttons do not have discernible text.", "suggestion": "Ensure all buttons have text labels." }
+      ]
     },
-    "lighthouseDesktop": {},
-    "lighthouseMobile": {}
+    "lighthouseDesktop": {
+      "performance": 92,
+      "accessibility": 98,
+      "bestPractices": 100,
+      "seo": 95,
+      "firstContentfulPaint": 1200,
+      "largestContentfulPaint": 1800,
+      "cumulativeLayoutShift": 0.01,
+      "totalBlockingTime": 50,
+      "speedIndex": 1300,
+      "interactionToNextPaint": 1500
+    },
+    "lighthouseMobile": {
+      "performance": 85,
+      "accessibility": 95,
+      "bestPractices": 98,
+      "seo": 90,
+      "firstContentfulPaint": 1800,
+      "largestContentfulPaint": 2500,
+      "cumulativeLayoutShift": 0.03,
+      "totalBlockingTime": 120,
+      "speedIndex": 2100,
+      "interactionToNextPaint": 2200
+    }
   }
 }

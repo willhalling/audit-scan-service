@@ -177,6 +177,11 @@ export interface PageAccessibilityData {
   }>;
 }
 
+export interface WordCloudItem {
+  text: string;
+  size: number;
+}
+
 export interface PageData {
   url: string;
   pagePath: string;
@@ -217,6 +222,7 @@ export interface PageData {
   lighthouseMobile?: ReducedLighthouseData;
   accessibilityDesktop?: { violations: ReducedAccessibilityViolation[] };
   accessibilityMobile?: { violations: ReducedAccessibilityViolation[] };
+  wordCloudData?: WordCloudItem[];
 }
 
 export interface AuditResult {
@@ -232,8 +238,8 @@ export interface AuditResult {
 
 // Only the fields to save for each violation
 export interface ReducedAccessibilityViolation {
-  description: string;
-  help: string;
+  issue: string;
+  suggestion: string;
 }
 
 // Only the fields to save for Lighthouse

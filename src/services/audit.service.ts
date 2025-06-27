@@ -128,14 +128,14 @@ export class AuditService {
         // Save only description and help for violations
         pageData.accessibilityDesktop = {
           violations: desktopResult.violations.map(v => ({
-            description: v.description,
-            help: v.help
+            issue: v.description,
+            suggestion: v.help
           }))
         };
         pageData.accessibilityMobile = {
           violations: mobileResult.violations.map(v => ({
-            description: v.description,
-            help: v.help
+            issue: v.description,
+            suggestion: v.help
           }))
         };
         // To revert to saving all data, just use: violations: desktopResult.violations

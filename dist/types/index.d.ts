@@ -162,6 +162,10 @@ export interface PageAccessibilityData {
         }>;
     }>;
 }
+export interface WordCloudItem {
+    text: string;
+    size: number;
+}
 export interface PageData {
     url: string;
     pagePath: string;
@@ -206,6 +210,7 @@ export interface PageData {
     accessibilityMobile?: {
         violations: ReducedAccessibilityViolation[];
     };
+    wordCloudData?: WordCloudItem[];
 }
 export interface AuditResult {
     auditId: string;
@@ -218,8 +223,8 @@ export interface AuditResult {
     error?: string;
 }
 export interface ReducedAccessibilityViolation {
-    description: string;
-    help: string;
+    issue: string;
+    suggestion: string;
 }
 export interface ReducedLighthouseData {
     performance: number;
