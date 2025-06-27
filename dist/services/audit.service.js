@@ -77,30 +77,78 @@ export class AuditService {
             }
             try {
                 console.log(`♿ Running accessibility audit for ${pageData.url}`);
-                const accessibilityResult = await AccessibilityService.runAccessibilityAudit(pageData.url, auditId, host);
-                console.log(`♿ Accessibility result:`, accessibilityResult);
-                if (accessibilityResult.annotatedDesktopUrl) {
-                    allScreenshots.annotatedDesktopUrl = accessibilityResult.annotatedDesktopUrl;
-                    console.log(`✅ Added annotated desktop URL: ${accessibilityResult.annotatedDesktopUrl}`);
+                const desktopResult = await AccessibilityService.runSingleAccessibilityAudit(pageData.url, auditId, host, 'desktop');
+                const mobileResult = await AccessibilityService.runSingleAccessibilityAudit(pageData.url, auditId, host, 'mobile');
+                if (desktopResult.annotatedScreenshotUrl) {
+                    allScreenshots.annotatedDesktopUrl = desktopResult.annotatedScreenshotUrl;
+                    console.log(`✅ Added annotated desktop URL: ${desktopResult.annotatedScreenshotUrl}`);
                 }
                 else {
                     console.log('⚠️ No annotated desktop screenshot URL returned.');
                 }
-                if (accessibilityResult.annotatedMobileUrl) {
-                    allScreenshots.annotatedMobileUrl = accessibilityResult.annotatedMobileUrl;
-                    console.log(`✅ Added annotated mobile URL: ${accessibilityResult.annotatedMobileUrl}`);
+                if (mobileResult.annotatedScreenshotUrl) {
+                    allScreenshots.annotatedMobileUrl = mobileResult.annotatedScreenshotUrl;
+                    console.log(`✅ Added annotated mobile URL: ${mobileResult.annotatedScreenshotUrl}`);
                 }
                 else {
                     console.log('⚠️ No annotated mobile screenshot URL returned.');
                 }
-                pageData.accessibility = {
-                    missingAltCount: accessibilityResult.accessibility.summary?.totalViolations || 0,
-                    totalImages: 0,
-                    missingAltExamples: []
+                pageData.accessibilityDesktop = {
+                    violations: desktopResult.violations.map(v => ({
+                        description: v.description,
+                        help: v.help
+                    }))
+                };
+                pageData.accessibilityMobile = {
+                    violations: mobileResult.violations.map(v => ({
+                        description: v.description,
+                        help: v.help
+                    }))
                 };
             }
             catch (accessibilityError) {
                 console.error(`⚠️ Accessibility audit failed for ${pageData.url}, continuing without annotated screenshots:`, accessibilityError);
+            }
+            try {
+                console.log(`🚦 Running Lighthouse desktop audit for ${pageData.url}`);
+                const lighthouseDesktop = await (await import('./lighthouse.service.js')).LighthouseService.runLighthouse({
+                    url: pageData.url,
+                    useDesktop: true
+                });
+                pageData.lighthouseDesktop = {
+                    performance: Math.round((lighthouseDesktop.categories.performance?.score || 0) * 100),
+                    accessibility: Math.round((lighthouseDesktop.categories.accessibility?.score || 0) * 100),
+                    bestPractices: Math.round((lighthouseDesktop.categories['best-practices']?.score || 0) * 100),
+                    seo: Math.round((lighthouseDesktop.categories.seo?.score || 0) * 100),
+                    firstContentfulPaint: Math.round(lighthouseDesktop.audits['first-contentful-paint']?.numericValue || 0),
+                    largestContentfulPaint: Math.round(lighthouseDesktop.audits['largest-contentful-paint']?.numericValue || 0),
+                    cumulativeLayoutShift: lighthouseDesktop.audits['cumulative-layout-shift']?.numericValue || 0,
+                    totalBlockingTime: Math.round(lighthouseDesktop.audits['total-blocking-time']?.numericValue || 0),
+                    speedIndex: Math.round(lighthouseDesktop.audits['speed-index']?.numericValue || 0),
+                    interactionToNextPaint: Math.round(lighthouseDesktop.audits['interactive']?.numericValue || 0)
+                };
+                console.log('✅ Lighthouse desktop audit complete');
+                console.log(`🚦 Running Lighthouse mobile audit for ${pageData.url}`);
+                const lighthouseMobile = await (await import('./lighthouse.service.js')).LighthouseService.runLighthouse({
+                    url: pageData.url,
+                    useDesktop: false
+                });
+                pageData.lighthouseMobile = {
+                    performance: Math.round((lighthouseMobile.categories.performance?.score || 0) * 100),
+                    accessibility: Math.round((lighthouseMobile.categories.accessibility?.score || 0) * 100),
+                    bestPractices: Math.round((lighthouseMobile.categories['best-practices']?.score || 0) * 100),
+                    seo: Math.round((lighthouseMobile.categories.seo?.score || 0) * 100),
+                    firstContentfulPaint: Math.round(lighthouseMobile.audits['first-contentful-paint']?.numericValue || 0),
+                    largestContentfulPaint: Math.round(lighthouseMobile.audits['largest-contentful-paint']?.numericValue || 0),
+                    cumulativeLayoutShift: lighthouseMobile.audits['cumulative-layout-shift']?.numericValue || 0,
+                    totalBlockingTime: Math.round(lighthouseMobile.audits['total-blocking-time']?.numericValue || 0),
+                    speedIndex: Math.round(lighthouseMobile.audits['speed-index']?.numericValue || 0),
+                    interactionToNextPaint: Math.round(lighthouseMobile.audits['interactive']?.numericValue || 0)
+                };
+                console.log('✅ Lighthouse mobile audit complete');
+            }
+            catch (lighthouseError) {
+                console.error(`⚠️ Lighthouse audit failed for ${pageData.url}:`, lighthouseError);
             }
             console.log(`📊 Final screenshots (3 total):`, allScreenshots);
             pageData.screenshots = [allScreenshots];

@@ -198,6 +198,14 @@ export interface PageData {
         low: string[];
     };
     suggestions?: string[];
+    lighthouseDesktop?: ReducedLighthouseData;
+    lighthouseMobile?: ReducedLighthouseData;
+    accessibilityDesktop?: {
+        violations: ReducedAccessibilityViolation[];
+    };
+    accessibilityMobile?: {
+        violations: ReducedAccessibilityViolation[];
+    };
 }
 export interface AuditResult {
     auditId: string;
@@ -208,5 +216,21 @@ export interface AuditResult {
     completedAt?: number;
     pages?: PageData[];
     error?: string;
+}
+export interface ReducedAccessibilityViolation {
+    description: string;
+    help: string;
+}
+export interface ReducedLighthouseData {
+    performance: number;
+    accessibility: number;
+    bestPractices: number;
+    seo: number;
+    firstContentfulPaint: number;
+    largestContentfulPaint: number;
+    cumulativeLayoutShift: number;
+    totalBlockingTime: number;
+    speedIndex: number;
+    interactionToNextPaint?: number;
 }
 //# sourceMappingURL=index.d.ts.map

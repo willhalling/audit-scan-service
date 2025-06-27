@@ -15,7 +15,10 @@ export declare class AccessibilityService {
         annotatedDesktopUrl?: string;
         annotatedMobileUrl?: string;
     }>;
-    private static runSingleAccessibilityAudit;
+    static runSingleAccessibilityAudit(url: string, auditId: string, host: string, viewport: 'desktop' | 'mobile'): Promise<{
+        violations: any[];
+        annotatedScreenshotUrl?: string;
+    }>;
     private static getElementCoordinates;
     private static annotateScreenshot;
     private static getImpactColor;

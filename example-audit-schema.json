@@ -6,20 +6,23 @@
     "meta": {
       "title": "Example Page Title",
       "description": "This is an example page description.",
-      "keywords": ["example", "test", "audit"],
+      "keywords": [
+        "example",
+        "test",
+        "audit"
+      ],
       "language": "en",
       "charset": "UTF-8",
       "viewport": "width=device-width, initial-scale=1.0",
       "canonical": "https://example.com"
     },
-    
     "isRobotsDoFollow": true,
     "hasViewportMetaTag": true,
     "canonical": "https://example.com",
     "ctas": [],
     "bodyText": "",
     "textToHtmlRatio": 0.5,
-    "headers": { 
+    "headers": {
       "h1": "Example H1",
       "h2": "Example H2",
       "h3": "Example H3",
@@ -29,17 +32,19 @@
     },
     "hasSingleH1": true,
     "screenshots": [
-        {
-            "desktopUrl": "firestorage/<auditId>/desktop.png",
-            "annotatedDesktopUrl": "firestorage/<auditId>/annoated-desktop.png",
-            "annotatedMobileUrl": "firestorage/<auditId>/annoated-mobile.png"
-        }
+      {
+        "desktopUrl": "firestorage/<auditId>/desktop.png",
+        "annotatedDesktopUrl": "firestorage/<auditId>/annoated-desktop.png",
+        "annotatedMobileUrl": "firestorage/<auditId>/annoated-mobile.png"
+      }
     ],
     "accessibilityDesktop": {
       "violations": []
     },
     "accessibilityMobile": {
       "violations": []
-    }
+    },
+    "lighthouseDesktop": {},
+    "lighthouseMobile": {}
   }
 }

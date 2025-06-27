@@ -67,7 +67,7 @@ export class AccessibilityService {
     return result;
   }
 
-  private static async runSingleAccessibilityAudit(
+  public static async runSingleAccessibilityAudit(
     url: string,
     auditId: string,
     host: string,
