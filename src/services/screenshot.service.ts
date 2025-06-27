@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import { ScreenshotOptions, PageScreenshots } from '../types/index.js';
 import { StorageService } from './storage.service.js';
+import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class ScreenshotService {
   // Screenshot dimensions for different use cases
@@ -13,43 +14,67 @@ export class ScreenshotService {
   };
 
   static async takeScreenshot(options: ScreenshotOptions): Promise<Buffer> {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
+    let lastError: Error | null = null;
+    
+    // Try main configuration first, then alternative if it fails
+    const configurations = [
+      await PuppeteerConfig.getLaunchOptions(),
+      await PuppeteerConfig.getAlternativeLaunchOptions()
+    ];
+    
+    for (let i = 0; i < configurations.length; i++) {
+      try {
+        console.log(`📸 Attempting screenshot with config ${i + 1}/${configurations.length}`);
+        const browser = await puppeteer.launch(configurations[i]);
 
-    try {
-      const page = await browser.newPage();
-      
-      if (options.viewport) {
-        await page.setViewport(options.viewport);
-      } else {
-        await page.setViewport({ width: 1280, height: 720 });
-      }
+        try {
+          const page = await browser.newPage();
+          
+          if (options.viewport) {
+            await page.setViewport(options.viewport);
+          } else {
+            await page.setViewport({ width: 1280, height: 720 });
+          }
 
-      await page.goto(options.url, { waitUntil: 'networkidle2', timeout: 30000 });
+          await page.goto(options.url, { waitUntil: 'networkidle2', timeout: 30000 });
 
-      // Hide elements before screenshot if specified
-      if (options.hideSelectors && options.hideSelectors.length > 0) {
-        await page.evaluate((selectors) => {
-          selectors.forEach((selector) => {
-            const el = document.querySelector(selector);
-            if (el) {
-              (el as HTMLElement).style.display = 'none';
-            }
+          // Hide elements before screenshot if specified
+          if (options.hideSelectors && options.hideSelectors.length > 0) {
+            await page.evaluate((selectors) => {
+              selectors.forEach((selector) => {
+                const el = document.querySelector(selector);
+                if (el) {
+                  (el as HTMLElement).style.display = 'none';
+                }
+              });
+            }, options.hideSelectors);
+          }
+
+          const screenshot = await page.screenshot({
+            fullPage: options.fullPage || false,
+            type: 'png'
           });
-        }, options.hideSelectors);
+
+          return screenshot as Buffer;
+        } finally {
+          await browser.close();
+        }
+      } catch (error) {
+        console.error(`❌ Screenshot attempt ${i + 1} failed:`, error);
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        
+        // If this is the last configuration, throw the error
+        if (i === configurations.length - 1) {
+          throw lastError;
+        }
+        
+        // Wait a bit before trying the next configuration
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
-
-      const screenshot = await page.screenshot({
-        fullPage: options.fullPage || false,
-        type: 'png'
-      });
-
-      return screenshot as Buffer;
-    } finally {
-      await browser.close();
     }
+    
+    // This shouldn't be reached, but just in case
+    throw lastError || new Error('All screenshot attempts failed');
   }
 
   static async takeAndUploadScreenshots(

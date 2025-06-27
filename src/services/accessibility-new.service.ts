@@ -2,6 +2,7 @@ import puppeteer from 'puppeteer';
 import sharp from 'sharp';
 import { StorageService } from './storage.service.js';
 import { PageAccessibilityData } from '../types/index.js';
+import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class AccessibilityService {
   // Accessibility screenshot dimensions (exact specs from requirements)
@@ -73,106 +74,153 @@ export class AccessibilityService {
     host: string,
     viewport: 'desktop' | 'mobile'
   ): Promise<{ violations: any[]; annotatedScreenshotUrl?: string }> {
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-    });
-
-    try {
-      const page = await browser.newPage();
-      
-      // Set viewport based on type with accessibility dimensions
-      const viewportConfig = viewport === 'mobile' 
-        ? this.DIMENSIONS.MOBILE
-        : this.DIMENSIONS.DESKTOP;
+    let lastError: Error | null = null;
+    const maxRetries = 2;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      let browser = null;
+      try {
+        console.log(`♿ Accessibility ${viewport} audit attempt ${attempt}/${maxRetries} for ${url}`);
         
-      await page.setViewport(viewportConfig);
-      console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height}`);
-      
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-
-      // Hide elements before screenshot
-      await page.evaluate(() => {
-        const el = document.querySelector('#CybotCookiebotDialog');
-        if (el) {
-          (el as HTMLElement).style.display = 'none';
-        }
-      });
-
-      // Inject axe-core
-      await page.addScriptTag({
-        url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
-      });
-
-      // Run axe-core accessibility audit
-      const axeResults = await page.evaluate(() => {
-        return new Promise((resolve) => {
-          (window as any).axe.run((err: any, results: any) => {
-            if (err) {
-              resolve({ violations: [], passes: [] });
-            } else {
-              resolve(results);
-            }
-          });
+        browser = await puppeteer.launch(await PuppeteerConfig.getLaunchOptions());
+        
+        const page = await browser.newPage();
+        
+        // Set viewport based on type with accessibility dimensions
+        const viewportConfig = viewport === 'mobile' 
+          ? this.DIMENSIONS.MOBILE
+          : this.DIMENSIONS.DESKTOP;
+          
+        await page.setViewport(viewportConfig);
+        console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height}`);
+        
+        // Navigate with longer timeout and better error handling
+        await page.goto(url, { 
+          waitUntil: 'networkidle2', 
+          timeout: 60000 // Increased timeout for production
         });
-      });
 
-      const violations = (axeResults as any).violations || [];
-      console.log(`♿ Found ${violations.length} ${viewport} violations`);
-      
-      let annotatedScreenshotUrl: string | undefined;
+        // Hide elements before screenshot
+        await page.evaluate(() => {
+          const el = document.querySelector('#CybotCookiebotDialog');
+          if (el) {
+            (el as HTMLElement).style.display = 'none';
+          }
+        });
 
-      // Always create annotated screenshots, even if there are no violations
-      // Get element coordinates for annotation (empty if no violations)
-      const elementCoordinates = await this.getElementCoordinates(page, violations);
-      // Take screenshot
-      const screenshot = await page.screenshot({
-        fullPage: false,
-        type: 'png'
-      });
-      // Annotate screenshot with violations (will be a plain screenshot if no violations)
-      const annotatedScreenshot = await this.annotateScreenshot(
-        screenshot as Buffer,
-        violations,
-        elementCoordinates
-      );
-      // Upload annotated screenshot
-      const screenshotType = viewport === 'mobile' ? 'annotated-mobile' : 'annotated-desktop';
-      annotatedScreenshotUrl = await StorageService.uploadScreenshot(
-        annotatedScreenshot,
-        auditId,
-        screenshotType,
-        host
-      );
-      console.log(`✅ ${viewport} annotated screenshot uploaded: ${annotatedScreenshotUrl}`);
+        // Inject axe-core with error handling
+        try {
+          await page.addScriptTag({
+            url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
+          });
+        } catch (scriptError) {
+          console.warn('Failed to load axe-core from CDN, trying fallback...');
+          await page.addScriptTag({
+            url: 'https://unpkg.com/axe-core@4.8.2/axe.min.js'
+          });
+        }
 
-      // Format violations for storage
-      const formattedViolations = violations.map((v: any) => ({
-        id: v.id,
-        impact: v.impact,
-        description: v.description,
-        help: v.help,
-        helpUrl: v.helpUrl,
-        tags: v.tags,
-        nodes: v.nodes.map((node: any) => ({
-          html: node.html,
-          target: node.target
-        }))
-      }));
+        // Run axe-core accessibility audit with timeout
+        const axeResults = await Promise.race([
+          page.evaluate(() => {
+            return new Promise((resolve) => {
+              (window as any).axe.run((err: any, results: any) => {
+                if (err) {
+                  resolve({ violations: [], passes: [] });
+                } else {
+                  resolve(results);
+                }
+              });
+            });
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Axe evaluation timeout')), 30000)
+          )
+        ]);
 
-      const result: { violations: any[]; annotatedScreenshotUrl?: string } = {
-        violations: formattedViolations
-      };
+        const violations = (axeResults as any).violations || [];
+        console.log(`♿ Found ${violations.length} ${viewport} violations`);
+        
+        let annotatedScreenshotUrl: string | undefined;
 
-      if (annotatedScreenshotUrl) {
-        result.annotatedScreenshotUrl = annotatedScreenshotUrl;
+        // Take screenshot with error handling
+        try {
+          const elementCoordinates = await this.getElementCoordinates(page, violations);
+          const screenshot = await page.screenshot({
+            fullPage: false,
+            type: 'png'
+          });
+          
+          const annotatedScreenshot = await this.annotateScreenshot(
+            screenshot as Buffer,
+            violations,
+            elementCoordinates
+          );
+          
+          const screenshotType = viewport === 'mobile' ? 'annotated-mobile' : 'annotated-desktop';
+          annotatedScreenshotUrl = await StorageService.uploadScreenshot(
+            annotatedScreenshot,
+            auditId,
+            screenshotType,
+            host
+          );
+          console.log(`✅ ${viewport} annotated screenshot uploaded: ${annotatedScreenshotUrl}`);
+        } catch (screenshotError) {
+          console.warn(`⚠️ Screenshot failed for ${viewport}:`, screenshotError);
+          // Continue without screenshot
+        }
+
+        // Format violations for storage
+        const formattedViolations = violations.map((v: any) => ({
+          id: v.id,
+          impact: v.impact,
+          description: v.description,
+          help: v.help,
+          helpUrl: v.helpUrl,
+          nodes: v.nodes?.slice(0, 3).map((node: any) => ({
+            html: node.html?.substring(0, 200),
+            target: node.target,
+            failureSummary: node.failureSummary
+          })) || []
+        }));
+
+        await browser.close();
+        
+        const result: { violations: any[]; annotatedScreenshotUrl?: string } = {
+          violations: formattedViolations
+        };
+        
+        if (annotatedScreenshotUrl) {
+          result.annotatedScreenshotUrl = annotatedScreenshotUrl;
+        }
+        
+        return result;
+        
+      } catch (error) {
+        console.error(`❌ Accessibility ${viewport} audit attempt ${attempt} failed:`, error);
+        lastError = error instanceof Error ? error : new Error('Unknown error');
+        
+        // Clean up browser if it exists
+        if (browser) {
+          try {
+            await browser.close();
+          } catch (closeError) {
+            console.warn('Failed to close browser:', closeError);
+          }
+        }
+        
+        // If this was the last attempt, throw the error
+        if (attempt === maxRetries) {
+          throw lastError;
+        }
+        
+        // Wait before retry, longer wait for session closed errors
+        const waitTime = error instanceof Error && error.message.includes('Session closed') ? 5000 : 2000;
+        await new Promise(resolve => setTimeout(resolve, waitTime));
       }
-
-      return result;
-
-    } finally {
-      await browser.close();
     }
+    
+    throw lastError || new Error('All accessibility audit attempts failed');
   }
 
   private static async getElementCoordinates(

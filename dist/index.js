@@ -6,6 +6,7 @@ import cors from 'cors';
 import auditRoutes from './routes/audit.routes.js';
 import lighthouseRoutes from './routes/lighthouse.routes.js';
 import screenshotRoutes from './routes/screenshot.routes.js';
+import diagnosticRoutes from './routes/diagnostic.routes.js';
 process.on('uncaughtException', (error) => {
     console.error('UNCAUGHT EXCEPTION:', error);
     console.log('⚠️ The application will continue running, but may be in an inconsistent state');
@@ -43,6 +44,7 @@ try {
     app.use('/audit', auditRoutes);
     app.use('/lighthouse', lighthouseRoutes);
     app.use('/screenshot', screenshotRoutes);
+    app.use('/diagnostic', diagnosticRoutes);
     console.log('Routes registered successfully');
 }
 catch (error) {

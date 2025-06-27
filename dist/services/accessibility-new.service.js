@@ -1,6 +1,7 @@
 import puppeteer from 'puppeteer';
 import sharp from 'sharp';
 import { StorageService } from './storage.service.js';
+import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 export class AccessibilityService {
     static async runAccessibilityAudit(url, auditId, host) {
         console.log(`♿ Running accessibility audit for ${url}`);
@@ -33,74 +34,112 @@ export class AccessibilityService {
         return result;
     }
     static async runSingleAccessibilityAudit(url, auditId, host, viewport) {
-        const browser = await puppeteer.launch({
-            headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
-        });
-        try {
-            const page = await browser.newPage();
-            const viewportConfig = viewport === 'mobile'
-                ? this.DIMENSIONS.MOBILE
-                : this.DIMENSIONS.DESKTOP;
-            await page.setViewport(viewportConfig);
-            console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height}`);
-            await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-            await page.evaluate(() => {
-                const el = document.querySelector('#CybotCookiebotDialog');
-                if (el) {
-                    el.style.display = 'none';
-                }
-            });
-            await page.addScriptTag({
-                url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
-            });
-            const axeResults = await page.evaluate(() => {
-                return new Promise((resolve) => {
-                    window.axe.run((err, results) => {
-                        if (err) {
-                            resolve({ violations: [], passes: [] });
-                        }
-                        else {
-                            resolve(results);
-                        }
-                    });
+        let lastError = null;
+        const maxRetries = 2;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            let browser = null;
+            try {
+                console.log(`♿ Accessibility ${viewport} audit attempt ${attempt}/${maxRetries} for ${url}`);
+                browser = await puppeteer.launch(await PuppeteerConfig.getLaunchOptions());
+                const page = await browser.newPage();
+                const viewportConfig = viewport === 'mobile'
+                    ? this.DIMENSIONS.MOBILE
+                    : this.DIMENSIONS.DESKTOP;
+                await page.setViewport(viewportConfig);
+                console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height}`);
+                await page.goto(url, {
+                    waitUntil: 'networkidle2',
+                    timeout: 60000
                 });
-            });
-            const violations = axeResults.violations || [];
-            console.log(`♿ Found ${violations.length} ${viewport} violations`);
-            let annotatedScreenshotUrl;
-            const elementCoordinates = await this.getElementCoordinates(page, violations);
-            const screenshot = await page.screenshot({
-                fullPage: false,
-                type: 'png'
-            });
-            const annotatedScreenshot = await this.annotateScreenshot(screenshot, violations, elementCoordinates);
-            const screenshotType = viewport === 'mobile' ? 'annotated-mobile' : 'annotated-desktop';
-            annotatedScreenshotUrl = await StorageService.uploadScreenshot(annotatedScreenshot, auditId, screenshotType, host);
-            console.log(`✅ ${viewport} annotated screenshot uploaded: ${annotatedScreenshotUrl}`);
-            const formattedViolations = violations.map((v) => ({
-                id: v.id,
-                impact: v.impact,
-                description: v.description,
-                help: v.help,
-                helpUrl: v.helpUrl,
-                tags: v.tags,
-                nodes: v.nodes.map((node) => ({
-                    html: node.html,
-                    target: node.target
-                }))
-            }));
-            const result = {
-                violations: formattedViolations
-            };
-            if (annotatedScreenshotUrl) {
-                result.annotatedScreenshotUrl = annotatedScreenshotUrl;
+                await page.evaluate(() => {
+                    const el = document.querySelector('#CybotCookiebotDialog');
+                    if (el) {
+                        el.style.display = 'none';
+                    }
+                });
+                try {
+                    await page.addScriptTag({
+                        url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
+                    });
+                }
+                catch (scriptError) {
+                    console.warn('Failed to load axe-core from CDN, trying fallback...');
+                    await page.addScriptTag({
+                        url: 'https://unpkg.com/axe-core@4.8.2/axe.min.js'
+                    });
+                }
+                const axeResults = await Promise.race([
+                    page.evaluate(() => {
+                        return new Promise((resolve) => {
+                            window.axe.run((err, results) => {
+                                if (err) {
+                                    resolve({ violations: [], passes: [] });
+                                }
+                                else {
+                                    resolve(results);
+                                }
+                            });
+                        });
+                    }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Axe evaluation timeout')), 30000))
+                ]);
+                const violations = axeResults.violations || [];
+                console.log(`♿ Found ${violations.length} ${viewport} violations`);
+                let annotatedScreenshotUrl;
+                try {
+                    const elementCoordinates = await this.getElementCoordinates(page, violations);
+                    const screenshot = await page.screenshot({
+                        fullPage: false,
+                        type: 'png'
+                    });
+                    const annotatedScreenshot = await this.annotateScreenshot(screenshot, violations, elementCoordinates);
+                    const screenshotType = viewport === 'mobile' ? 'annotated-mobile' : 'annotated-desktop';
+                    annotatedScreenshotUrl = await StorageService.uploadScreenshot(annotatedScreenshot, auditId, screenshotType, host);
+                    console.log(`✅ ${viewport} annotated screenshot uploaded: ${annotatedScreenshotUrl}`);
+                }
+                catch (screenshotError) {
+                    console.warn(`⚠️ Screenshot failed for ${viewport}:`, screenshotError);
+                }
+                const formattedViolations = violations.map((v) => ({
+                    id: v.id,
+                    impact: v.impact,
+                    description: v.description,
+                    help: v.help,
+                    helpUrl: v.helpUrl,
+                    nodes: v.nodes?.slice(0, 3).map((node) => ({
+                        html: node.html?.substring(0, 200),
+                        target: node.target,
+                        failureSummary: node.failureSummary
+                    })) || []
+                }));
+                await browser.close();
+                const result = {
+                    violations: formattedViolations
+                };
+                if (annotatedScreenshotUrl) {
+                    result.annotatedScreenshotUrl = annotatedScreenshotUrl;
+                }
+                return result;
             }
-            return result;
+            catch (error) {
+                console.error(`❌ Accessibility ${viewport} audit attempt ${attempt} failed:`, error);
+                lastError = error instanceof Error ? error : new Error('Unknown error');
+                if (browser) {
+                    try {
+                        await browser.close();
+                    }
+                    catch (closeError) {
+                        console.warn('Failed to close browser:', closeError);
+                    }
+                }
+                if (attempt === maxRetries) {
+                    throw lastError;
+                }
+                const waitTime = error instanceof Error && error.message.includes('Session closed') ? 5000 : 2000;
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
         }
-        finally {
-            await browser.close();
-        }
+        throw lastError || new Error('All accessibility audit attempts failed');
     }
     static async getElementCoordinates(page, violations) {
         console.log('📍 Getting element coordinates for', violations.length, 'violations');

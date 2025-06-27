@@ -1,5 +1,6 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
+import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 export class LighthouseService {
     static async processQueue() {
         if (this.isProcessing || this.queue.length === 0) {
@@ -30,7 +31,11 @@ export class LighthouseService {
     }
     static async runLighthouse(config) {
         return this.queueLighthouse(async () => {
-            const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless', '--no-sandbox'] });
+            const chrome = await chromeLauncher.launch({
+                chromeFlags: await PuppeteerConfig.getChromeLauncherFlags(),
+                chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+                startingUrl: 'about:blank'
+            });
             try {
                 const options = {
                     logLevel: 'error',

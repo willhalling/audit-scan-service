@@ -28,6 +28,10 @@ class FirebaseService {
     constructor() {
         try {
             console.log('Initializing Firebase service...');
+            console.log('Environment check:');
+            console.log('- NODE_ENV:', process.env.NODE_ENV);
+            console.log('- FIREBASE_SERVICE_ACCOUNT exists:', !!process.env.FIREBASE_SERVICE_ACCOUNT);
+            console.log('- FIREBASE_PRIVATE_KEY exists:', !!process.env.FIREBASE_PRIVATE_KEY);
             if (getApps().length === 0) {
                 console.log('No Firebase apps initialized yet, creating a new one');
                 let serviceAccount;

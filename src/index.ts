@@ -7,6 +7,7 @@ import cors from 'cors';
 import auditRoutes from './routes/audit.routes.js';
 import lighthouseRoutes from './routes/lighthouse.routes.js';
 import screenshotRoutes from './routes/screenshot.routes.js';
+import diagnosticRoutes from './routes/diagnostic.routes.js';
 
 // Make sure we catch and handle all unhandled errors
 process.on('uncaughtException', (error) => {
@@ -56,6 +57,7 @@ try {
   app.use('/audit', auditRoutes);
   app.use('/lighthouse', lighthouseRoutes);
   app.use('/screenshot', screenshotRoutes);
+  app.use('/diagnostic', diagnosticRoutes);
   console.log('Routes registered successfully');
 } catch (error) {
   console.error('Error registering routes:', error);

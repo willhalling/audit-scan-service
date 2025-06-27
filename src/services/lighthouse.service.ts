@@ -1,6 +1,7 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import { LighthouseConfig, LighthouseResult } from '../types/index.js';
+import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class LighthouseService {
   private static queue: Array<() => Promise<any>> = [];
@@ -58,9 +59,20 @@ export class LighthouseService {
 
   static async runLighthouse(config: LighthouseConfig): Promise<LighthouseResult> {
     return this.queueLighthouse(async () => {
-      const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless', '--no-sandbox'] });
+      let chrome: any = null;
       
       try {
+        console.log('🚀 Launching Chrome for Lighthouse...');
+        chrome = await chromeLauncher.launch({ 
+          chromeFlags: await PuppeteerConfig.getChromeLauncherFlags(),
+          chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+          startingUrl: 'about:blank',
+          handleSIGINT: false,
+          logLevel: 'error'
+        });
+        
+        console.log(`✅ Chrome launched successfully on port ${chrome.port}`);
+        
         const options = {
           logLevel: 'error' as const,
           output: 'json' as const,
@@ -69,7 +81,9 @@ export class LighthouseService {
           settings: {
             onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'],
             skipAudits: ['unused-javascript', 'unused-css-rules'],
-            disableStorageReset: true
+            disableStorageReset: true,
+            maxWaitForFcp: 30000,
+            maxWaitForLoad: 45000
           }
         };
 
@@ -123,8 +137,19 @@ export class LighthouseService {
           lighthouseVersion: runnerResult.lhr.lighthouseVersion,
           userAgent: runnerResult.lhr.userAgent
         };
+      } catch (lighthouseError) {
+        console.error('❌ Lighthouse execution failed:', lighthouseError);
+        throw lighthouseError;
       } finally {
-        await chrome.kill();
+        if (chrome) {
+          console.log('🔄 Killing Chrome process...');
+          try {
+            await chrome.kill();
+            console.log('✅ Chrome process killed successfully');
+          } catch (killError) {
+            console.error('⚠️ Error killing Chrome process:', killError);
+          }
+        }
       }
     });
   }
