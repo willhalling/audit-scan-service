@@ -83,117 +83,125 @@ export class AuditService {
       
       console.log(`🔍 Starting audit for ${auditId}`);
       
-      // Scrape the main page
-      const pageData = await ScrapeService.scrapePage(request.url);
-      const pages = [pageData];
-      
-      // Process the page
-      console.log(`📊 Processing page: ${pageData.url}`);
-      
-      const host = new URL(pageData.url).hostname.replace(/^www\./, '');
-      
-      // Take basic screenshots (desktop + mobile) - this must succeed
-      console.log(`📸 Taking screenshots for ${pageData.url}`);
-      const screenshots = await ScreenshotService.takeAndUploadScreenshots(pageData.url, auditId, host);
-      console.log(`📸 Screenshots result:`, screenshots);
-      
-      // Initialize screenshots object with cover page screenshot
-      const allScreenshots: PageScreenshots = {};
-      
-      if (screenshots.desktopUrl) {
-        allScreenshots.desktopUrl = screenshots.desktopUrl; // Cover page screenshot
-        console.log(`✅ Added cover page URL: ${screenshots.desktopUrl}`);
-      }
-      
-      // Run accessibility audit to get annotated screenshots and violations
-      try {
-        console.log(`♿ Running accessibility audit for ${pageData.url}`);
-        // Run desktop accessibility audit
-        const desktopResult = await AccessibilityService.runSingleAccessibilityAudit(pageData.url, auditId, host, 'desktop');
-        // Run mobile accessibility audit
-        const mobileResult = await AccessibilityService.runSingleAccessibilityAudit(pageData.url, auditId, host, 'mobile');
-        // Add annotated screenshots
-        if (desktopResult.annotatedScreenshotUrl) {
-          allScreenshots.annotatedDesktopUrl = desktopResult.annotatedScreenshotUrl;
-          console.log(`✅ Added annotated desktop URL: ${desktopResult.annotatedScreenshotUrl}`);
-        } else {
-          console.log('⚠️ No annotated desktop screenshot URL returned.');
+      // Build list of URLs to scan: main URL + up to 5 custom pages
+      const baseUrl = request.url.replace(/\/$/, '');
+      const pagePaths = Array.isArray(request.pages) ? request.pages.slice(0, 5) : [];
+      const urlsToScan = [baseUrl, ...pagePaths.map(path => path.startsWith('/') ? baseUrl + path : baseUrl + '/' + path.replace(/^\//, ''))];
+      const pages = [];
+
+      for (const urlToScan of urlsToScan) {
+        // Scrape the page
+        const pageData = await ScrapeService.scrapePage(urlToScan);
+        pages.push(pageData);
+        
+        // Process the page
+        console.log(`📊 Processing page: ${pageData.url}`);
+        
+        const host = new URL(pageData.url).hostname.replace(/^www\./, '');
+        
+        // Take basic screenshots (desktop + mobile) - this must succeed
+        console.log(`📸 Taking screenshots for ${pageData.url}`);
+        const screenshots = await ScreenshotService.takeAndUploadScreenshots(pageData.url, auditId, host);
+        console.log(`📸 Screenshots result:`, screenshots);
+        
+        // Initialize screenshots object with cover page screenshot
+        const allScreenshots: PageScreenshots = {};
+        
+        if (screenshots.desktopUrl) {
+          allScreenshots.desktopUrl = screenshots.desktopUrl; // Cover page screenshot
+          console.log(`✅ Added cover page URL: ${screenshots.desktopUrl}`);
         }
-        if (mobileResult.annotatedScreenshotUrl) {
-          allScreenshots.annotatedMobileUrl = mobileResult.annotatedScreenshotUrl;
-          console.log(`✅ Added annotated mobile URL: ${mobileResult.annotatedScreenshotUrl}`);
-        } else {
-          console.log('⚠️ No annotated mobile screenshot URL returned.');
+        
+        // Run accessibility audit to get annotated screenshots and violations
+        try {
+          console.log(`♿ Running accessibility audit for ${pageData.url}`);
+          // Run desktop accessibility audit
+          const desktopResult = await AccessibilityService.runSingleAccessibilityAudit(pageData.url, auditId, host, 'desktop');
+          // Run mobile accessibility audit
+          const mobileResult = await AccessibilityService.runSingleAccessibilityAudit(pageData.url, auditId, host, 'mobile');
+          // Add annotated screenshots
+          if (desktopResult.annotatedScreenshotUrl) {
+            allScreenshots.annotatedDesktopUrl = desktopResult.annotatedScreenshotUrl;
+            console.log(`✅ Added annotated desktop URL: ${desktopResult.annotatedScreenshotUrl}`);
+          } else {
+            console.log('⚠️ No annotated desktop screenshot URL returned.');
+          }
+          if (mobileResult.annotatedScreenshotUrl) {
+            allScreenshots.annotatedMobileUrl = mobileResult.annotatedScreenshotUrl;
+            console.log(`✅ Added annotated mobile URL: ${mobileResult.annotatedScreenshotUrl}`);
+          } else {
+            console.log('⚠️ No annotated mobile screenshot URL returned.');
+          }
+          // Save only description and help for violations
+          pageData.accessibilityDesktop = {
+            violations: desktopResult.violations.map(v => ({
+              issue: v.description,
+              suggestion: v.help
+            }))
+          };
+          pageData.accessibilityMobile = {
+            violations: mobileResult.violations.map(v => ({
+              issue: v.description,
+              suggestion: v.help
+            }))
+          };
+          // To revert to saving all data, just use: violations: desktopResult.violations
+        } catch (accessibilityError) {
+          console.error(`⚠️ Accessibility audit failed for ${pageData.url}, continuing without annotated screenshots:`, accessibilityError);
         }
-        // Save only description and help for violations
-        pageData.accessibilityDesktop = {
-          violations: desktopResult.violations.map(v => ({
-            issue: v.description,
-            suggestion: v.help
-          }))
-        };
-        pageData.accessibilityMobile = {
-          violations: mobileResult.violations.map(v => ({
-            issue: v.description,
-            suggestion: v.help
-          }))
-        };
-        // To revert to saving all data, just use: violations: desktopResult.violations
-      } catch (accessibilityError) {
-        console.error(`⚠️ Accessibility audit failed for ${pageData.url}, continuing without annotated screenshots:`, accessibilityError);
+
+        // Run Lighthouse audits sequentially (desktop, then mobile)
+        try {
+          console.log(`🚦 Running Lighthouse desktop audit for ${pageData.url}`);
+          const lighthouseDesktop = await (await import('./lighthouse.service.js')).LighthouseService.runLighthouse({
+            url: pageData.url,
+            useDesktop: true
+          });
+          // Save only scores and core vitals
+          pageData.lighthouseDesktop = {
+            performance: Math.round((lighthouseDesktop.categories.performance?.score || 0) * 100),
+            accessibility: Math.round((lighthouseDesktop.categories.accessibility?.score || 0) * 100),
+            bestPractices: Math.round((lighthouseDesktop.categories['best-practices']?.score || 0) * 100),
+            seo: Math.round((lighthouseDesktop.categories.seo?.score || 0) * 100),
+            firstContentfulPaint: Math.round(lighthouseDesktop.audits['first-contentful-paint']?.numericValue || 0),
+            largestContentfulPaint: Math.round(lighthouseDesktop.audits['largest-contentful-paint']?.numericValue || 0),
+            cumulativeLayoutShift: lighthouseDesktop.audits['cumulative-layout-shift']?.numericValue || 0,
+            totalBlockingTime: Math.round(lighthouseDesktop.audits['total-blocking-time']?.numericValue || 0),
+            speedIndex: Math.round(lighthouseDesktop.audits['speed-index']?.numericValue || 0),
+            interactionToNextPaint: Math.round(lighthouseDesktop.audits['interactive']?.numericValue || 0)
+          };
+          console.log('✅ Lighthouse desktop audit complete');
+
+          console.log(`🚦 Running Lighthouse mobile audit for ${pageData.url}`);
+          const lighthouseMobile = await (await import('./lighthouse.service.js')).LighthouseService.runLighthouse({
+            url: pageData.url,
+            useDesktop: false
+          });
+          pageData.lighthouseMobile = {
+            performance: Math.round((lighthouseMobile.categories.performance?.score || 0) * 100),
+            accessibility: Math.round((lighthouseMobile.categories.accessibility?.score || 0) * 100),
+            bestPractices: Math.round((lighthouseMobile.categories['best-practices']?.score || 0) * 100),
+            seo: Math.round((lighthouseMobile.categories.seo?.score || 0) * 100),
+            firstContentfulPaint: Math.round(lighthouseMobile.audits['first-contentful-paint']?.numericValue || 0),
+            largestContentfulPaint: Math.round(lighthouseMobile.audits['largest-contentful-paint']?.numericValue || 0),
+            cumulativeLayoutShift: lighthouseMobile.audits['cumulative-layout-shift']?.numericValue || 0,
+            totalBlockingTime: Math.round(lighthouseMobile.audits['total-blocking-time']?.numericValue || 0),
+            speedIndex: Math.round(lighthouseMobile.audits['speed-index']?.numericValue || 0),
+            interactionToNextPaint: Math.round(lighthouseMobile.audits['interactive']?.numericValue || 0)
+          };
+          console.log('✅ Lighthouse mobile audit complete');
+          // To revert to saving all data, just use: pageData.lighthouseDesktop = lighthouseDesktop
+        } catch (lighthouseError) {
+          console.error(`⚠️ Lighthouse audit failed for ${pageData.url}:`, lighthouseError);
+        }
+        
+        console.log(`📊 Final screenshots (3 total):`, allScreenshots);
+        
+        // Add screenshots to page
+        pageData.screenshots = [allScreenshots];
+        console.log(`✅ Screenshots added to pageData:`, pageData.screenshots);
       }
 
-      // Run Lighthouse audits sequentially (desktop, then mobile)
-      try {
-        console.log(`🚦 Running Lighthouse desktop audit for ${pageData.url}`);
-        const lighthouseDesktop = await (await import('./lighthouse.service.js')).LighthouseService.runLighthouse({
-          url: pageData.url,
-          useDesktop: true
-        });
-        // Save only scores and core vitals
-        pageData.lighthouseDesktop = {
-          performance: Math.round((lighthouseDesktop.categories.performance?.score || 0) * 100),
-          accessibility: Math.round((lighthouseDesktop.categories.accessibility?.score || 0) * 100),
-          bestPractices: Math.round((lighthouseDesktop.categories['best-practices']?.score || 0) * 100),
-          seo: Math.round((lighthouseDesktop.categories.seo?.score || 0) * 100),
-          firstContentfulPaint: Math.round(lighthouseDesktop.audits['first-contentful-paint']?.numericValue || 0),
-          largestContentfulPaint: Math.round(lighthouseDesktop.audits['largest-contentful-paint']?.numericValue || 0),
-          cumulativeLayoutShift: lighthouseDesktop.audits['cumulative-layout-shift']?.numericValue || 0,
-          totalBlockingTime: Math.round(lighthouseDesktop.audits['total-blocking-time']?.numericValue || 0),
-          speedIndex: Math.round(lighthouseDesktop.audits['speed-index']?.numericValue || 0),
-          interactionToNextPaint: Math.round(lighthouseDesktop.audits['interactive']?.numericValue || 0)
-        };
-        console.log('✅ Lighthouse desktop audit complete');
-
-        console.log(`🚦 Running Lighthouse mobile audit for ${pageData.url}`);
-        const lighthouseMobile = await (await import('./lighthouse.service.js')).LighthouseService.runLighthouse({
-          url: pageData.url,
-          useDesktop: false
-        });
-        pageData.lighthouseMobile = {
-          performance: Math.round((lighthouseMobile.categories.performance?.score || 0) * 100),
-          accessibility: Math.round((lighthouseMobile.categories.accessibility?.score || 0) * 100),
-          bestPractices: Math.round((lighthouseMobile.categories['best-practices']?.score || 0) * 100),
-          seo: Math.round((lighthouseMobile.categories.seo?.score || 0) * 100),
-          firstContentfulPaint: Math.round(lighthouseMobile.audits['first-contentful-paint']?.numericValue || 0),
-          largestContentfulPaint: Math.round(lighthouseMobile.audits['largest-contentful-paint']?.numericValue || 0),
-          cumulativeLayoutShift: lighthouseMobile.audits['cumulative-layout-shift']?.numericValue || 0,
-          totalBlockingTime: Math.round(lighthouseMobile.audits['total-blocking-time']?.numericValue || 0),
-          speedIndex: Math.round(lighthouseMobile.audits['speed-index']?.numericValue || 0),
-          interactionToNextPaint: Math.round(lighthouseMobile.audits['interactive']?.numericValue || 0)
-        };
-        console.log('✅ Lighthouse mobile audit complete');
-        // To revert to saving all data, just use: pageData.lighthouseDesktop = lighthouseDesktop
-      } catch (lighthouseError) {
-        console.error(`⚠️ Lighthouse audit failed for ${pageData.url}:`, lighthouseError);
-      }
-      
-      console.log(`📊 Final screenshots (3 total):`, allScreenshots);
-      
-      // Add screenshots to page
-      pageData.screenshots = [allScreenshots];
-      console.log(`✅ Screenshots added to pageData:`, pageData.screenshots);
-      
       // Save all pages to Firebase
       console.log(`💾 Saving page data to Firebase`);
       await firebaseService.updateAuditPages(auditId, pages);

@@ -112,8 +112,7 @@ export interface ElementCoordinate {
 
 export interface AuditRequest {
   url: string;
-  useDesktop?: boolean;
-  categories?: string[];
+  pages?: string[]; // Array of up to 5 page paths (e.g. ['/about', '/contact'])
 }
 
 export interface PageMeta {

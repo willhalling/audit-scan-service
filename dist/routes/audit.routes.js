@@ -4,7 +4,7 @@ import { normalizeUrl, isValidUrl } from '../utils/helpers.js';
 const router = Router();
 router.post('/start', async (req, res) => {
     try {
-        const { url, useDesktop = false, categories } = req.body;
+        const { url, pages } = req.body;
         if (!url) {
             return res.status(400).json({ error: 'URL is required' });
         }
@@ -14,8 +14,7 @@ router.post('/start', async (req, res) => {
         }
         const result = await AuditService.startAudit({
             url: normalizedUrl,
-            useDesktop,
-            categories
+            ...(pages ? { pages } : {})
         });
         if (result.error) {
             return res.status(400).json({
@@ -35,7 +34,7 @@ router.post('/start', async (req, res) => {
 });
 router.get('/start', async (req, res) => {
     try {
-        const { url, useDesktop = false, categories } = req.query;
+        const { url, pages } = req.query;
         if (!url || typeof url !== 'string') {
             return res.status(400).json({ error: 'URL is required' });
         }
@@ -44,11 +43,10 @@ router.get('/start', async (req, res) => {
             return res.status(400).json({ error: 'Invalid URL format' });
         }
         const auditRequest = {
-            url: normalizedUrl,
-            useDesktop: useDesktop === 'true'
+            url: normalizedUrl
         };
-        if (typeof categories === 'string') {
-            auditRequest.categories = categories.split(',');
+        if (typeof pages === 'string') {
+            auditRequest.pages = pages.split(',');
         }
         const result = await AuditService.startAudit(auditRequest);
         if (result.error) {

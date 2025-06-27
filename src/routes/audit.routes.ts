@@ -7,7 +7,7 @@ const router = Router();
 // Start a new audit
 router.post('/start', async (req: Request, res: Response) => {
   try {
-    const { url, useDesktop = false, categories } = req.body;
+    const { url, pages } = req.body;
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
@@ -20,8 +20,7 @@ router.post('/start', async (req: Request, res: Response) => {
 
     const result = await AuditService.startAudit({
       url: normalizedUrl,
-      useDesktop,
-      categories
+      ...(pages ? { pages } : {})
     });
 
     if (result.error) {
@@ -44,7 +43,7 @@ router.post('/start', async (req: Request, res: Response) => {
 // Start a new audit (GET with query params)
 router.get('/start', async (req: Request, res: Response) => {
   try {
-    const { url, useDesktop = false, categories } = req.query;
+    const { url, pages } = req.query;
 
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'URL is required' });
@@ -56,12 +55,11 @@ router.get('/start', async (req: Request, res: Response) => {
     }
 
     const auditRequest: any = {
-      url: normalizedUrl,
-      useDesktop: useDesktop === 'true'
+      url: normalizedUrl
     };
 
-    if (typeof categories === 'string') {
-      auditRequest.categories = categories.split(',');
+    if (typeof pages === 'string') {
+      auditRequest.pages = pages.split(',');
     }
 
     const result = await AuditService.startAudit(auditRequest);

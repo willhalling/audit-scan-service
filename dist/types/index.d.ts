@@ -103,8 +103,7 @@ export interface ElementCoordinate {
 }
 export interface AuditRequest {
     url: string;
-    useDesktop?: boolean;
-    categories?: string[];
+    pages?: string[];
 }
 export interface PageMeta {
     title: string;
