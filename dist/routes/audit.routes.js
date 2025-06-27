@@ -4,7 +4,7 @@ import { normalizeUrl, isValidUrl } from '../utils/helpers.js';
 const router = Router();
 router.post('/start', async (req, res) => {
     try {
-        const { url, pages } = req.body;
+        const { url, pages, authorUid } = req.body;
         if (!url) {
             return res.status(400).json({ error: 'URL is required' });
         }
@@ -14,7 +14,8 @@ router.post('/start', async (req, res) => {
         }
         const result = await AuditService.startAudit({
             url: normalizedUrl,
-            ...(pages ? { pages } : {})
+            ...(pages ? { pages } : {}),
+            ...(authorUid ? { authorUid } : {})
         });
         if (result.error) {
             return res.status(400).json({
@@ -34,7 +35,7 @@ router.post('/start', async (req, res) => {
 });
 router.get('/start', async (req, res) => {
     try {
-        const { url, pages } = req.query;
+        const { url, pages, authorUid } = req.query;
         if (!url || typeof url !== 'string') {
             return res.status(400).json({ error: 'URL is required' });
         }
@@ -47,6 +48,9 @@ router.get('/start', async (req, res) => {
         };
         if (typeof pages === 'string') {
             auditRequest.pages = pages.split(',');
+        }
+        if (typeof authorUid === 'string') {
+            auditRequest.authorUid = authorUid;
         }
         const result = await AuditService.startAudit(auditRequest);
         if (result.error) {
@@ -81,6 +85,28 @@ router.get('/:auditId', async (req, res) => {
         console.error('❌ Audit status error:', error);
         return res.status(500).json({
             error: 'Failed to get audit status',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+router.get('/:auditId/download', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        if (!auditId) {
+            return res.status(400).json({ error: 'Audit ID is required' });
+        }
+        const audit = await AuditService.getAuditStatus(auditId);
+        if (!audit) {
+            return res.status(404).json({ error: 'Audit not found' });
+        }
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="audit-${auditId}.json"`);
+        return res.json(audit);
+    }
+    catch (error) {
+        console.error('❌ Audit download error:', error);
+        return res.status(500).json({
+            error: 'Failed to download audit',
             details: error instanceof Error ? error.message : 'Unknown error'
         });
     }

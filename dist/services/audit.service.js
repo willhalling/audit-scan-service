@@ -52,7 +52,7 @@ export class AuditService {
             return result;
         }
         const auditId = this.generateAuditId(request.url);
-        await firebaseService.createAudit(auditId, request.url);
+        await firebaseService.createAudit(auditId, request.url, request.authorUid);
         this.runAudit(auditId, request).catch(async (error) => {
             console.error(`❌ Audit ${auditId} failed:`, error);
             await firebaseService.updateAuditError(auditId, error.message);

@@ -113,6 +113,7 @@ export interface ElementCoordinate {
 export interface AuditRequest {
   url: string;
   pages?: string[]; // Array of up to 5 page paths (e.g. ['/about', '/contact'])
+  authorUid?: string; // Optional author UID to associate with the audit
 }
 
 export interface PageMeta {
@@ -233,6 +234,7 @@ export interface AuditResult {
   completedAt?: number;
   pages?: PageData[];
   error?: string;
+  authorUid?: string; // Optional author UID associated with the audit
 }
 
 // Only the fields to save for each violation

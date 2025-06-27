@@ -4,7 +4,7 @@ declare class FirebaseService {
     private app;
     constructor();
     private cleanData;
-    createAudit(auditId: string, url: string): Promise<void>;
+    createAudit(auditId: string, url: string, authorUid?: string): Promise<void>;
     updateAuditStatus(auditId: string, status: AuditResult['status']): Promise<void>;
     updateAuditPages(auditId: string, pages: PageData[]): Promise<void>;
     updateAuditError(auditId: string, error: string): Promise<void>;
@@ -13,7 +13,7 @@ declare class FirebaseService {
 export declare const getFirebaseService: () => FirebaseService;
 export declare const firebaseService: {
     readonly instance: FirebaseService;
-    createAudit(auditId: string, url: string): Promise<void>;
+    createAudit(auditId: string, url: string, authorUid?: string): Promise<void>;
     updateAuditStatus(auditId: string, status: any): Promise<void>;
     updateAuditPages(auditId: string, pages: any[]): Promise<void>;
     updateAuditError(auditId: string, error: string): Promise<void>;

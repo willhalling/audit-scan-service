@@ -104,6 +104,7 @@ export interface ElementCoordinate {
 export interface AuditRequest {
     url: string;
     pages?: string[];
+    authorUid?: string;
 }
 export interface PageMeta {
     title: string;
@@ -220,6 +221,7 @@ export interface AuditResult {
     completedAt?: number;
     pages?: PageData[];
     error?: string;
+    authorUid?: string;
 }
 export interface ReducedAccessibilityViolation {
     issue: string;

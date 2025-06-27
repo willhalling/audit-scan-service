@@ -65,8 +65,8 @@ export class AuditService {
 
     const auditId = this.generateAuditId(request.url);
     
-    // Create audit record in Firebase
-    await firebaseService.createAudit(auditId, request.url);
+    // Create audit record in Firebase with authorUid if provided
+    await firebaseService.createAudit(auditId, request.url, request.authorUid);
     
     // Start the audit process in the background
     this.runAudit(auditId, request).catch(async (error) => {

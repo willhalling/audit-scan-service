@@ -94,6 +94,23 @@ Get the status and results of an audit.
 }
 ```
 
+#### Download Audit as JSON
+```
+GET /audit/{auditId}/download
+```
+Download the complete audit results as a JSON file.
+
+**Response:**
+- Returns the complete audit data as a downloadable JSON file
+- Filename: `audit-{auditId}.json`
+- Content-Type: `application/json`
+
+**Example:**
+```bash
+curl -O "http://localhost:8080/audit/example-com-4r17/download"
+# Downloads: audit-example-com-4r17.json
+```
+
 ### Health Check
 ```
 GET /health
@@ -407,7 +424,7 @@ export default async function handler(req, res) {
 ```js
 // Example: Trigger audit from a form
 const startAudit = async () => {
-  const res = await fetch('/api/start-audit', {
+  const res = await fetch('/api/start', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

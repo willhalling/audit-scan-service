@@ -107,7 +107,7 @@ class FirebaseService {
     return data;
   }
 
-  async createAudit(auditId: string, url: string): Promise<void> {
+  async createAudit(auditId: string, url: string, authorUid?: string): Promise<void> {
     if (!this.db) throw new Error('Firestore is not initialized');
     const host = new URL(url).hostname.replace(/^www\./, '');
     const auditData: AuditResult = {
@@ -115,7 +115,8 @@ class FirebaseService {
       host,
       url,
       status: 'pending',
-      createdAt: Date.now()
+      createdAt: Date.now(),
+      ...(authorUid ? { authorUid } : {})
     };
 
     await this.db.collection('audits').doc(auditId).set(auditData);
@@ -170,8 +171,8 @@ export const firebaseService = {
     return getFirebaseService();
   },
   
-  async createAudit(auditId: string, url: string) {
-    return this.instance.createAudit(auditId, url);
+  async createAudit(auditId: string, url: string, authorUid?: string) {
+    return this.instance.createAudit(auditId, url, authorUid);
   },
   
   async updateAuditStatus(auditId: string, status: any) {
