@@ -92,6 +92,7 @@ export interface ScreenshotOptions {
         width: number;
         height: number;
     };
+    hideSelectors?: string[];
 }
 export interface ElementCoordinate {
     x: number;

@@ -91,6 +91,14 @@ export class AccessibilityService {
       
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
 
+      // Hide elements before screenshot
+      await page.evaluate(() => {
+        const el = document.querySelector('#CybotCookiebotDialog');
+        if (el) {
+          (el as HTMLElement).style.display = 'none';
+        }
+      });
+
       // Inject axe-core
       await page.addScriptTag({
         url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'

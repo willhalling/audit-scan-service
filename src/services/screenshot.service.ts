@@ -28,7 +28,19 @@ export class ScreenshotService {
       }
 
       await page.goto(options.url, { waitUntil: 'networkidle2', timeout: 30000 });
-      
+
+      // Hide elements before screenshot if specified
+      if (options.hideSelectors && options.hideSelectors.length > 0) {
+        await page.evaluate((selectors) => {
+          selectors.forEach((selector) => {
+            const el = document.querySelector(selector);
+            if (el) {
+              (el as HTMLElement).style.display = 'none';
+            }
+          });
+        }, options.hideSelectors);
+      }
+
       const screenshot = await page.screenshot({
         fullPage: options.fullPage || false,
         type: 'png'
@@ -51,7 +63,8 @@ export class ScreenshotService {
     const coverScreenshot = await this.takeScreenshot({
       url,
       viewport: { width: 1366, height: 850 }, // Updated size for desktop screenshot
-      fullPage: false
+      fullPage: false,
+      hideSelectors: ['#CybotCookiebotDialog'] // Hide cookie dialog by default
     });
 
     const desktopUrl = await StorageService.uploadScreenshot(

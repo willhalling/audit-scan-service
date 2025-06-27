@@ -45,6 +45,12 @@ export class AccessibilityService {
             await page.setViewport(viewportConfig);
             console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height}`);
             await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+            await page.evaluate(() => {
+                const el = document.querySelector('#CybotCookiebotDialog');
+                if (el) {
+                    el.style.display = 'none';
+                }
+            });
             await page.addScriptTag({
                 url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
             });

@@ -15,6 +15,16 @@ export class ScreenshotService {
                 await page.setViewport({ width: 1280, height: 720 });
             }
             await page.goto(options.url, { waitUntil: 'networkidle2', timeout: 30000 });
+            if (options.hideSelectors && options.hideSelectors.length > 0) {
+                await page.evaluate((selectors) => {
+                    selectors.forEach((selector) => {
+                        const el = document.querySelector(selector);
+                        if (el) {
+                            el.style.display = 'none';
+                        }
+                    });
+                }, options.hideSelectors);
+            }
             const screenshot = await page.screenshot({
                 fullPage: options.fullPage || false,
                 type: 'png'
@@ -30,7 +40,8 @@ export class ScreenshotService {
         const coverScreenshot = await this.takeScreenshot({
             url,
             viewport: { width: 1366, height: 850 },
-            fullPage: false
+            fullPage: false,
+            hideSelectors: ['#CybotCookiebotDialog']
         });
         const desktopUrl = await StorageService.uploadScreenshot(coverScreenshot, auditId, 'desktop', host);
         console.log(`✅ Cover page screenshot uploaded: ${desktopUrl}`);
