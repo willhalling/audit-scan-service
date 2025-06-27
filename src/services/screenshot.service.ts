@@ -47,10 +47,10 @@ export class ScreenshotService {
   ): Promise<PageScreenshots> {
     console.log(`📸 Taking cover page screenshot for ${url}`);
     
-    // Cover page screenshot - full size desktop (will be scaled to 27% in PDF)
+    // Cover page screenshot - 1366x850 for desktop
     const coverScreenshot = await this.takeScreenshot({
       url,
-      viewport: { width: 1920, height: 1080 }, // Full size for cover
+      viewport: { width: 1366, height: 850 }, // Updated size for desktop screenshot
       fullPage: false
     });
 

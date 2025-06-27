@@ -115,10 +115,14 @@ export class AuditService {
         if (accessibilityResult.annotatedDesktopUrl) {
           allScreenshots.annotatedDesktopUrl = accessibilityResult.annotatedDesktopUrl;
           console.log(`✅ Added annotated desktop URL: ${accessibilityResult.annotatedDesktopUrl}`);
+        } else {
+          console.log('⚠️ No annotated desktop screenshot URL returned.');
         }
         if (accessibilityResult.annotatedMobileUrl) {
           allScreenshots.annotatedMobileUrl = accessibilityResult.annotatedMobileUrl;
           console.log(`✅ Added annotated mobile URL: ${accessibilityResult.annotatedMobileUrl}`);
+        } else {
+          console.log('⚠️ No annotated mobile screenshot URL returned.');
         }
         
         // Update accessibility data

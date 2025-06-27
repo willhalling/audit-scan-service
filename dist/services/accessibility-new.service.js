@@ -63,18 +63,15 @@ export class AccessibilityService {
             const violations = axeResults.violations || [];
             console.log(`♿ Found ${violations.length} ${viewport} violations`);
             let annotatedScreenshotUrl;
-            if (violations.length > 0) {
-                console.log(`🔍 Found ${violations.length} accessibility violations for ${viewport}`);
-                const elementCoordinates = await this.getElementCoordinates(page, violations);
-                const screenshot = await page.screenshot({
-                    fullPage: false,
-                    type: 'png'
-                });
-                const annotatedScreenshot = await this.annotateScreenshot(screenshot, violations, elementCoordinates);
-                const screenshotType = viewport === 'mobile' ? 'annotated-mobile' : 'annotated-desktop';
-                annotatedScreenshotUrl = await StorageService.uploadScreenshot(annotatedScreenshot, auditId, screenshotType, host);
-                console.log(`✅ ${viewport} annotated screenshot uploaded: ${annotatedScreenshotUrl}`);
-            }
+            const elementCoordinates = await this.getElementCoordinates(page, violations);
+            const screenshot = await page.screenshot({
+                fullPage: false,
+                type: 'png'
+            });
+            const annotatedScreenshot = await this.annotateScreenshot(screenshot, violations, elementCoordinates);
+            const screenshotType = viewport === 'mobile' ? 'annotated-mobile' : 'annotated-desktop';
+            annotatedScreenshotUrl = await StorageService.uploadScreenshot(annotatedScreenshot, auditId, screenshotType, host);
+            console.log(`✅ ${viewport} annotated screenshot uploaded: ${annotatedScreenshotUrl}`);
             const formattedViolations = violations.map((v) => ({
                 id: v.id,
                 impact: v.impact,
@@ -104,7 +101,7 @@ export class AccessibilityService {
         await page.evaluate(() => {
             window.scrollTo(0, 0);
         });
-        await page.waitForTimeout(500);
+        await new Promise(res => setTimeout(res, 500));
         const visualViolations = violations.filter((violation) => {
             const skipIds = [
                 'document-title', 'html-has-lang', 'meta-viewport',
@@ -171,23 +168,43 @@ export class AccessibilityService {
                 const color = this.getImpactColor(coord.impact);
                 annotations.push(`
           <circle cx="${x}" cy="${y}" r="15" fill="${color}" stroke="white" stroke-width="2" opacity="0.9"/>
-          <text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${index + 1}</text>
+          <text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="12" font-weight="bold" style="font-family: 'Inter', 'Arial', sans-serif;">${index + 1}</text>
         `);
             });
-            const legendY = height - 120;
-            annotations.push(`
-        <rect x="10" y="${legendY}" width="${width - 20}" height="100" fill="rgba(0,0,0,0.8)" rx="5"/>
-        <text x="20" y="${legendY + 25}" fill="white" font-size="14" font-weight="bold">Accessibility Issues</text>
-        <circle cx="30" cy="${legendY + 45}" r="8" fill="#dc2626"/>
-        <text x="50" y="${legendY + 50}" fill="white" font-size="12">Critical</text>
-        <circle cx="120" cy="${legendY + 45}" r="8" fill="#ea580c"/>
-        <text x="140" y="${legendY + 50}" fill="white" font-size="12">Serious</text>
-        <circle cx="210" cy="${legendY + 45}" r="8" fill="#d97706"/>
-        <text x="230" y="${legendY + 50}" fill="white" font-size="12">Moderate</text>
-        <circle cx="300" cy="${legendY + 45}" r="8" fill="#65a30d"/>
-        <text x="320" y="${legendY + 50}" fill="white" font-size="12">Minor</text>
-        <text x="20" y="${legendY + 80}" fill="white" font-size="10">Numbers indicate issue locations</text>
-      `);
+            const isMobile = width <= 400;
+            const legendHeight = isMobile ? 80 : 100;
+            const legendY = height - legendHeight - 10;
+            const legendFont = "font-family: 'Inter', 'Arial', sans-serif;";
+            if (isMobile) {
+                annotations.push(`
+          <rect x="10" y="${legendY}" width="${width - 20}" height="${legendHeight}" fill="rgba(0,0,0,0.8)" rx="5"/>
+          <text x="20" y="${legendY + 22}" fill="white" font-size="12" font-weight="bold" style="${legendFont}">Accessibility Issues</text>
+          <circle cx="30" cy="${legendY + 40}" r="6" fill="#dc2626"/>
+          <text x="45" y="${legendY + 44}" fill="white" font-size="10" style="${legendFont}">Critical</text>
+          <circle cx="110" cy="${legendY + 40}" r="6" fill="#ea580c"/>
+          <text x="125" y="${legendY + 44}" fill="white" font-size="10" style="${legendFont}">Serious</text>
+          <circle cx="30" cy="${legendY + 60}" r="6" fill="#d97706"/>
+          <text x="45" y="${legendY + 64}" fill="white" font-size="10" style="${legendFont}">Moderate</text>
+          <circle cx="110" cy="${legendY + 60}" r="6" fill="#65a30d"/>
+          <text x="125" y="${legendY + 64}" fill="white" font-size="10" style="${legendFont}">Minor</text>
+          <text x="20" y="${legendY + legendHeight - 10}" fill="white" font-size="9" style="${legendFont}">Numbers indicate issue locations</text>
+        `);
+            }
+            else {
+                annotations.push(`
+          <rect x="10" y="${legendY}" width="${width - 20}" height="${legendHeight}" fill="rgba(0,0,0,0.8)" rx="5"/>
+          <text x="20" y="${legendY + 25}" fill="white" font-size="14" font-weight="bold" style="${legendFont}">Accessibility Issues</text>
+          <circle cx="30" cy="${legendY + 45}" r="8" fill="#dc2626"/>
+          <text x="50" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Critical</text>
+          <circle cx="120" cy="${legendY + 45}" r="8" fill="#ea580c"/>
+          <text x="140" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Serious</text>
+          <circle cx="210" cy="${legendY + 45}" r="8" fill="#d97706"/>
+          <text x="230" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Moderate</text>
+          <circle cx="300" cy="${legendY + 45}" r="8" fill="#65a30d"/>
+          <text x="320" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Minor</text>
+          <text x="20" y="${legendY + 80}" fill="white" font-size="10" style="${legendFont}">Numbers indicate issue locations</text>
+        `);
+            }
             const svgOverlay = `
         <svg width="${width}" height="${height}">
           ${annotations.join('')}
@@ -220,7 +237,7 @@ export class AccessibilityService {
     }
 }
 AccessibilityService.DIMENSIONS = {
-    DESKTOP: { width: 545, height: 500 },
+    DESKTOP: { width: 1046, height: 679 },
     MOBILE: { width: 298, height: 742 }
 };
 //# sourceMappingURL=accessibility-new.service.js.map

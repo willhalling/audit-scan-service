@@ -99,6 +99,7 @@ export interface ScreenshotOptions {
     width: number;
     height: number;
   };
+  hideSelectors?: string[]; // Array of selectors to hide before screenshot
 }
 
 export interface ElementCoordinate {

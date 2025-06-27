@@ -29,7 +29,7 @@ export class ScreenshotService {
         console.log(`📸 Taking cover page screenshot for ${url}`);
         const coverScreenshot = await this.takeScreenshot({
             url,
-            viewport: { width: 1920, height: 1080 },
+            viewport: { width: 1366, height: 850 },
             fullPage: false
         });
         const desktopUrl = await StorageService.uploadScreenshot(coverScreenshot, auditId, 'desktop', host);
