@@ -4,7 +4,14 @@ A standalone Node.js service for handling heavy website scanning operations incl
 
 ## Overview
 
-This service extracts all heavy computational tasks from the main Next.js application to run as a separate service, typically deployed on Google Cloud Run. This architecture allows:
+This service extracts all heavy computational tasks from the main Next.js application to4. **Cloud Run container startup issues**:
+   - Ensure the container listens on the port specified by the `PORT` environment variable (8080)
+   - Check that all required environment variables are set in the deployment
+   - Verify that the `NODE_ENV` is set to `production`
+   - Ensure the correct `CMD` is specified in the Dockerfile
+   - **Firebase credentials**: Ensure the Firebase service account JSON is available
+     - Option 1: Include it in the Docker image (for testing only)
+     - Option 2: Pass it as base64-encoded environment variable (recommended for production)as a separate service, typically deployed on Google Cloud Run. This architecture allows:
 
 - **Unlimited execution time** for long-running scans
 - **Dedicated resources** for CPU/memory intensive operations
@@ -212,6 +219,7 @@ gcloud run deploy scan-service \\
 ### Environment Variables
 - `PORT`: Service port (default: 8080)
 - `SCAN_SERVICE_URL`: URL for the scan service (used by main app)
+- `FIREBASE_SERVICE_ACCOUNT`: Base64-encoded Firebase service account JSON (for Cloud Run)
 
 ### Main App Integration
 
@@ -313,7 +321,49 @@ This tests all endpoints with a sample website to ensure functionality.
    - Check image processing libraries
    - Monitor memory usage during processing
 
+4. **Cloud Run container startup issues**
+   - Ensure the container listens on the port specified by the `PORT` environment variable (8080)
+   - Check that all required environment variables are set in the deployment
+   - Verify that the `NODE_ENV` is set to `production`
+   - Ensure the correct `CMD` is specified in the Dockerfile
+
 ### Debugging
+
+#### Local Container Testing
+
+Test the container locally before deploying:
+
+```bash
+# Test container locally
+./debug-local.sh
+
+# Check if the health endpoint responds
+curl http://localhost:8080/health
+```
+
+#### View Cloud Run Logs
+
+Check the container logs in Cloud Run:
+
+```bash
+# View the most recent logs
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=scan-service" --limit 50
+
+# Filter for error logs only
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=scan-service AND severity>=ERROR" --limit 20
+```
+
+#### Health Check Verification
+
+The health check endpoint provides detailed diagnostic information:
+
+```bash
+# Get the service URL
+SERVICE_URL=$(gcloud run services describe scan-service --region us-central1 --format="value(status.url)")
+
+# Check the health endpoint
+curl -s "$SERVICE_URL/health"
+```
 
 Enable verbose logging by setting log levels in the application code or checking Cloud Run logs for detailed error information.
 
@@ -328,3 +378,49 @@ When making changes:
 ## License
 
 This service is part of the AuditScan.ai application.
+
+## Using This API from Next.js (or Any Frontend)
+
+You can call the audit API from your Next.js app using `fetch` or `axios`. Here’s an example using `fetch` in an API route or server action:
+
+```js
+// Example: pages/api/start-audit.js (Next.js API route)
+export default async function handler(req, res) {
+  if (req.method === 'POST') {
+    const { url, pages } = req.body;
+
+    const response = await fetch('https://your-api-endpoint/audit/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url, pages }),
+    });
+
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } else {
+    res.status(405).json({ error: 'Method not allowed' });
+  }
+}
+```
+
+**Client-side usage (React/Next.js):**
+```js
+// Example: Trigger audit from a form
+const startAudit = async () => {
+  const res = await fetch('/api/start-audit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      url: 'https://example.com',
+      pages: ['/about', '/contact']
+    }),
+  });
+  const data = await res.json();
+  // handle response
+};
+```
+
+**Notes:**
+- Replace `'https://your-api-endpoint/audit/start'` with your deployed API URL.
+- The API expects a POST request with a JSON body containing at least a `url` and optionally a `pages` array.
+- You can use this pattern in any framework (Next.js, React, Vue, etc.) that supports HTTP requests.

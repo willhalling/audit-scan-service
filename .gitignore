@@ -38,5 +38,3 @@ out/
 .env
 build
 dist
-
-audit-scan-firebase-adminsdk-fbsvc-00e968dacc.json
