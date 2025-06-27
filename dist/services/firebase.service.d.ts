@@ -1,0 +1,14 @@
+import { AuditResult, PageData } from '../types/index.js';
+declare class FirebaseService {
+    private db;
+    constructor();
+    private cleanData;
+    createAudit(auditId: string, url: string): Promise<void>;
+    updateAuditStatus(auditId: string, status: AuditResult['status']): Promise<void>;
+    updateAuditPages(auditId: string, pages: PageData[]): Promise<void>;
+    updateAuditError(auditId: string, error: string): Promise<void>;
+    getAudit(auditId: string): Promise<AuditResult | null>;
+}
+export declare const firebaseService: FirebaseService;
+export {};
+//# sourceMappingURL=firebase.service.d.ts.map

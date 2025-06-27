@@ -1,0 +1,91 @@
+import { Router } from 'express';
+import { AuditService } from '../services/audit.service.js';
+import { normalizeUrl, isValidUrl } from '../utils/helpers.js';
+const router = Router();
+router.post('/start', async (req, res) => {
+    try {
+        const { url, useDesktop = false, categories } = req.body;
+        if (!url) {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+        const normalizedUrl = normalizeUrl(url);
+        if (!isValidUrl(normalizedUrl)) {
+            return res.status(400).json({ error: 'Invalid URL format' });
+        }
+        const result = await AuditService.startAudit({
+            url: normalizedUrl,
+            useDesktop,
+            categories
+        });
+        if (result.error) {
+            return res.status(400).json({
+                error: result.error,
+                url: normalizedUrl
+            });
+        }
+        return res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Audit start error:', error);
+        return res.status(500).json({
+            error: 'Failed to start audit',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+router.get('/start', async (req, res) => {
+    try {
+        const { url, useDesktop = false, categories } = req.query;
+        if (!url || typeof url !== 'string') {
+            return res.status(400).json({ error: 'URL is required' });
+        }
+        const normalizedUrl = normalizeUrl(url);
+        if (!isValidUrl(normalizedUrl)) {
+            return res.status(400).json({ error: 'Invalid URL format' });
+        }
+        const auditRequest = {
+            url: normalizedUrl,
+            useDesktop: useDesktop === 'true'
+        };
+        if (typeof categories === 'string') {
+            auditRequest.categories = categories.split(',');
+        }
+        const result = await AuditService.startAudit(auditRequest);
+        if (result.error) {
+            return res.status(400).json({
+                error: result.error,
+                url: normalizedUrl
+            });
+        }
+        return res.json(result);
+    }
+    catch (error) {
+        console.error('❌ Audit start error:', error);
+        return res.status(500).json({
+            error: 'Failed to start audit',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+router.get('/:auditId', async (req, res) => {
+    try {
+        const { auditId } = req.params;
+        if (!auditId) {
+            return res.status(400).json({ error: 'Audit ID is required' });
+        }
+        const audit = await AuditService.getAuditStatus(auditId);
+        if (!audit) {
+            return res.status(404).json({ error: 'Audit not found' });
+        }
+        return res.json(audit);
+    }
+    catch (error) {
+        console.error('❌ Audit status error:', error);
+        return res.status(500).json({
+            error: 'Failed to get audit status',
+            details: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+});
+export default router;
+//# sourceMappingURL=audit.routes.js.map
