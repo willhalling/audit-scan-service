@@ -127,7 +127,7 @@ router.get('/browser-test', async (req: Request, res: Response) => {
             '--no-zygote',
             '--single-process'
           ],
-          chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+          chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/google-chrome-stable',
           startingUrl: 'about:blank'
         }),
         new Promise((_, reject) => 

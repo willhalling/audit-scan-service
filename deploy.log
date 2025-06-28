@@ -18,11 +18,13 @@ starting build "225d7bd5-5e81-4777-927c-3c3cc82c0957"
 FETCHSOURCE
 Fetching storage object: gs://audit-scan_cloudbuild/source/1751064330.230767-373b904848a744eab12c4482f5253db7.tgz#1751064331131049
 Copying gs://audit-scan_cloudbuild/source/1751064330.230767-373b904848a744eab12c4482f5253db7.tgz#1751064331131049...
-/ [0 files][    0.0 B/108.6 KiB]                                                / [1 files][108.6 KiB/108.6 KiB]                                                
+/ [0 files][    0.0 B/108.6 KiB]                                                
+/ [1 files][108.6 KiB/108.6 KiB]                                                
 Operation completed over 1 objects/108.6 KiB.
 BUILD
 Already have image (with digest): gcr.io/cloud-builders/docker
-Sending build context to Docker daemon  433.2kB
+Sending build context to Docker daemon  433.2kB
+
 Step 1/23 : FROM node:20-slim
 20-slim: Pulling from library/node
 dad67da3f26b: Already exists
@@ -783,7 +785,28 @@ Get:498 http://deb.debian.org/debian bookworm/main amd64 zutty amd64 0.14.0.2023
 [91mdebconf: delaying package configuration, since apt-utils is not installed
 [0mFetched 346 MB in 4s (80.9 MB/s)
 Selecting previously unselected package libssl3:amd64.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6089 files and directories currently installed.)
+(Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 6089 files and directories currently installed.)
 Preparing to unpack .../00-libssl3_3.0.16-1~deb12u1_amd64.deb ...
 Unpacking libssl3:amd64 (3.0.16-1~deb12u1) ...
 Selecting previously unselected package libargon2-1:amd64.
@@ -818,7 +841,28 @@ Preparing to unpack .../10-libsystemd-shared_252.38-1~deb12u1_amd64.deb ...
 Unpacking libsystemd-shared:amd64 (252.38-1~deb12u1) ...
 Setting up libssl3:amd64 (3.0.16-1~deb12u1) ...
 Selecting previously unselected package systemd.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6175 files and directories currently installed.)
+(Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 6175 files and directories currently installed.)
 Preparing to unpack .../systemd_252.38-1~deb12u1_amd64.deb ...
 Unpacking systemd (252.38-1~deb12u1) ...
 Setting up libargon2-1:amd64 (0~20171227-0.3+deb12u1) ...
@@ -831,16 +875,44 @@ Setting up libsystemd-shared:amd64 (252.38-1~deb12u1) ...
 Setting up libdevmapper1.02.1:amd64 (2:1.02.185-2) ...
 Setting up libcryptsetup12:amd64 (2:2.6.1-4~deb12u2) ...
 Setting up systemd (252.38-1~deb12u1) ...
-Created symlink /etc/systemd/system/getty.target.wants/getty@tty1.service → /lib/systemd/system/getty@.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/remote-fs.target → /lib/systemd/system/remote-fs.target.
-Created symlink /etc/systemd/system/sysinit.target.wants/systemd-pstore.service → /lib/systemd/system/systemd-pstore.service.
-Initializing machine ID from random generator.
-Creating group 'systemd-journal' with GID 999.
-Creating group 'systemd-network' with GID 998.
-Creating user 'systemd-network' (systemd Network Management) with UID 998 and GID 998.
+Created symlink /etc/systemd/system/getty.target.wants/getty@tty1.service → /lib/systemd/system/getty@.service.
+
+Created symlink /etc/systemd/system/multi-user.target.wants/remote-fs.target → /lib/systemd/system/remote-fs.target.
+
+Created symlink /etc/systemd/system/sysinit.target.wants/systemd-pstore.service → /lib/systemd/system/systemd-pstore.service.
+
+Initializing machine ID from random generator.
+
+Creating group 'systemd-journal' with GID 999.
+
+Creating group 'systemd-network' with GID 998.
+
+Creating user 'systemd-network' (systemd Network Management) with UID 998 and GID 998.
+
 Setting up dmsetup (2:1.02.185-2) ...
 Selecting previously unselected package systemd-sysv.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 7024 files and directories currently installed.)
+(Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 7024 files and directories currently installed.)
 Preparing to unpack .../00-systemd-sysv_252.38-1~deb12u1_amd64.deb ...
 Unpacking systemd-sysv (252.38-1~deb12u1) ...
 Selecting previously unselected package libdbus-1-3:amd64.
@@ -892,7 +964,28 @@ Setting up libpython3.11-minimal:amd64 (3.11.2-6+deb12u6) ...
 Setting up libexpat1:amd64 (2.5.0-1+deb12u1) ...
 Setting up python3.11-minimal (3.11.2-6+deb12u6) ...
 Selecting previously unselected package python3-minimal.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 9450 files and directories currently installed.)
+(Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 9450 files and directories currently installed.)
 Preparing to unpack .../00-python3-minimal_3.11.2-1+b1_amd64.deb ...
 Unpacking python3-minimal (3.11.2-1+b1) ...
 Selecting previously unselected package media-types.
@@ -945,7 +1038,28 @@ Preparing to unpack .../16-libpython3-stdlib_3.11.2-1+b1_amd64.deb ...
 Unpacking libpython3-stdlib:amd64 (3.11.2-1+b1) ...
 Setting up python3-minimal (3.11.2-1+b1) ...
 Selecting previously unselected package python3.
-(Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 9957 files and directories currently installed.)
+(Reading database ... 
+(Reading database ... 5%
+(Reading database ... 10%
+(Reading database ... 15%
+(Reading database ... 20%
+(Reading database ... 25%
+(Reading database ... 30%
+(Reading database ... 35%
+(Reading database ... 40%
+(Reading database ... 45%
+(Reading database ... 50%
+(Reading database ... 55%
+(Reading database ... 60%
+(Reading database ... 65%
+(Reading database ... 70%
+(Reading database ... 75%
+(Reading database ... 80%
+(Reading database ... 85%
+(Reading database ... 90%
+(Reading database ... 95%
+(Reading database ... 100%
+(Reading database ... 9957 files and directories currently installed.)
 Preparing to unpack .../000-python3_3.11.2-1+b1_amd64.deb ...
 Unpacking python3 (3.11.2-1+b1) ...
 Selecting previously unselected package sgml-base.
@@ -2436,10 +2550,14 @@ Setting up libproc2-0:amd64 (2:4.0.2-3) ...
 Setting up libpng16-16:amd64 (1.6.39-2) ...
 Setting up libmpc3:amd64 (1.3.1-1) ...
 Setting up systemd-timesyncd (252.38-1~deb12u1) ...
-Creating group 'systemd-timesync' with GID 997.
-Creating user 'systemd-timesync' (systemd Time Synchronization) with UID 997 and GID 997.
-Created symlink /etc/systemd/system/dbus-org.freedesktop.timesync1.service → /lib/systemd/system/systemd-timesyncd.service.
-Created symlink /etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service → /lib/systemd/system/systemd-timesyncd.service.
+Creating group 'systemd-timesync' with GID 997.
+
+Creating user 'systemd-timesync' (systemd Time Synchronization) with UID 997 and GID 997.
+
+Created symlink /etc/systemd/system/dbus-org.freedesktop.timesync1.service → /lib/systemd/system/systemd-timesyncd.service.
+
+Created symlink /etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service → /lib/systemd/system/systemd-timesyncd.service.
+
 Setting up libatomic1:amd64 (12.2.0-14+deb12u1) ...
 Setting up libvorbis0a:amd64 (1.3.7-1) ...
 Setting up udev (252.38-1~deb12u1) ...
@@ -2652,10 +2770,14 @@ Setting up gir1.2-freedesktop:amd64 (1.74.0-3) ...
 Setting up libharfbuzz-icu0:amd64 (6.0.0+dfsg-3) ...
 Setting up libxdamage1:amd64 (1:1.1.6-1) ...
 Setting up gpg-agent (2.2.40-1.1) ...
-Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent-browser.socket → /usr/lib/systemd/user/gpg-agent-browser.socket.
-Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent-extra.socket → /usr/lib/systemd/user/gpg-agent-extra.socket.
-Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent-ssh.socket → /usr/lib/systemd/user/gpg-agent-ssh.socket.
-Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent.socket → /usr/lib/systemd/user/gpg-agent.socket.
+Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent-browser.socket → /usr/lib/systemd/user/gpg-agent-browser.socket.
+
+Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent-extra.socket → /usr/lib/systemd/user/gpg-agent-extra.socket.
+
+Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent-ssh.socket → /usr/lib/systemd/user/gpg-agent-ssh.socket.
+
+Created symlink /etc/systemd/user/sockets.target.wants/gpg-agent.socket → /usr/lib/systemd/user/gpg-agent.socket.
+
 Setting up libxcb1-dev:amd64 (1.15-1) ...
 Setting up libxpm4:amd64 (1:3.5.12-1.1+deb12u1) ...
 Setting up libxrender1:amd64 (1:0.9.10-1.1) ...
@@ -2681,7 +2803,8 @@ Setting up libcairo2:amd64 (1.16.0-7) ...
 Setting up libxxf86vm1:amd64 (1:1.1.4-1+b2) ...
 Setting up libxnvctrl0:amd64 (525.85.05-3~deb12u1) ...
 Setting up dirmngr (2.2.40-1.1) ...
-Created symlink /etc/systemd/user/sockets.target.wants/dirmngr.socket → /usr/lib/systemd/user/dirmngr.socket.
+Created symlink /etc/systemd/user/sockets.target.wants/dirmngr.socket → /usr/lib/systemd/user/dirmngr.socket.
+
 Setting up libxcb-shm0-dev:amd64 (1.15-1) ...
 Setting up gir1.2-packagekitglib-1.0 (1.2.6-5) ...
 Setting up dbus-user-session (1.14.10-1~deb12u1) ...
@@ -2726,10 +2849,13 @@ Setting up gir1.2-notify-0.7:amd64 (0.8.1-1) ...
 Setting up avahi-daemon (0.8-10+deb12u1) ...
 invoke-rc.d: could not determine current runlevel
 invoke-rc.d: policy-rc.d denied execution of force-reload.
-Created symlink /etc/systemd/system/dbus-org.freedesktop.Avahi.service → /lib/systemd/system/avahi-daemon.service.
-Created symlink /etc/systemd/system/multi-user.target.wants/avahi-daemon.service → /lib/systemd/system/avahi-daemon.service.
-Created symlink /etc/systemd/system/sockets.target.wants/avahi-daemon.socket → /lib/systemd/system/avahi-daemon.socket.
-Setting up libgdk-pixbuf2.0-bin (2.42.10+dfsg-1+deb12u2) ...
+Created symlink /etc/systemd/system/dbus-org.freedesktop.Avahi.service → /lib/systemd/system/avahi-daemon.service.
+
+Created symlink /etc/systemd/system/multi-user.target.wants/avahi-daemon.service → /lib/systemd/system/avahi-daemon.service.
+
+Created symlink /etc/systemd/system/sockets.target.wants/avahi-daemon.socket → /lib/systemd/system/avahi-daemon.socket.
+/usr/bin/google-chrome-stable
+Setting up libgdk-pixbuf2.0/usr/bin/google-chrome-stableg-1+deb12u2) ...
 Setting up gir1.2-polkit-1.0 (122-3) ...
 Setting up libnsl2:amd64 (1.3.0-2) ...
 Setting up cups-pk-helper (0.2.6-1+b1) ...
@@ -2781,11 +2907,11 @@ Setting up libxaw7:amd64 (2:1.0.14-1) ...
 Setting up libatspi2.0-0:amd64 (2.46.0-5) ...
 Setting up x11-xserver-utils (7.7+9+b1) ...
 Setting up gcc (4:12.2.0-3) ...
-Setting up dpkg-dev (1.21.22) ...
+Setting up dpkg-dev (1.21.22) .../usr/bin/google-chrome-stable
 Setting up librsvg2-2:amd64 (2.54.7+dfsg-1~deb12u1) ...
 Setting up libatk-bridge2.0-0:amd64 (2.46.0-5) ...
 Setting up gir1.2-pango-1.0:amd64 (1.50.12+ds-1) ...
-Setting up libgl1:amd64 (1.6.0-1) ...
+Setting up libgl1:amd64 (1.6/usr/bin/google-chrome-stable
 Setting up librsvg2-common:amd64 (2.54.7+dfsg-1~deb12u1) ...
 Setting up libfile-desktopentry-perl (0.22-3) ...
 Setting up libwww-robotrules-perl (6.02-1) ...
@@ -2837,9 +2963,9 @@ Setting up python3-distutils (3.11.2-3) ...
 Setting up gsettings-desktop-schemas (43.0-1) ...
 Setting up libglib2.0-dev-bin (2.74.6-2+deb12u6) ...
 Setting up libblkid-dev:amd64 (2.38.1-5+deb12u3) ...
-Setting up python3-dbus (1.3.2-4+b1) ...
+Setting up python3-dbus /usr/bin/google-chrome-stable/usr/bin/google-chrome-stable
 Setting up python3-cairo:amd64 (1.20.1-5+b1) ...
-Setting up libgtk-3-0:amd64 (3.24.38-2~deb12u3) ...
+Setting up libgtk-3-0:amd64 (3.24.38-2~de/usr/bin/google-chrome-stable
 Setting up libpng-dev:amd64 (1.6.39-2) ...
 Setting up gir1.2-gtk-3.0:amd64 (3.24.38-2~deb12u3) ...
 Setting up libjpeg-dev:amd64 (1:2.1.5-2) ...
@@ -2870,7 +2996,7 @@ Setting up libxft-dev:amd64 (2.3.6-1) ...
 Setting up libgdk-pixbuf-2.0-dev:amd64 (2.42.10+dfsg-1+deb12u2) ...
 Setting up libharfbuzz-dev:amd64 (6.0.0+dfsg-3) ...
 Setting up system-config-printer (1.5.18-1) ...
-Setting up libpango1.0-dev:amd64 (1.50.12+ds-1) ...
+Setting up libpango1.0-dev:amd64 (1.50.12+d/usr/bin/google-chrome-stable
 Setting up librsvg2-dev:amd64 (2.54.7+dfsg-1~deb12u1) ...
 Setting up libwww-perl (6.68-1) ...
 Setting up liblwp-protocol-https-perl (6.10-1) ...
@@ -2881,8 +3007,10 @@ Processing triggers for systemd (252.38-1~deb12u1) ...
 Processing triggers for libc-bin (2.36-9+deb12u10) ...
 Processing triggers for sgml-base (1.31) ...
 Setting up polkitd (122-3) ...
-Creating group 'polkitd' with GID 996.
-Creating user 'polkitd' (polkit) with UID 996 and GID 996.
+Creating group 'polkitd' with GID 996.
+
+Creating user 'polkitd' (polkit) with UID 996 and GID 996.
+
 invoke-rc.d: could not determine current runlevel
 invoke-rc.d: policy-rc.d denied execution of reload.
 start-stop-daemon: unable to stat /usr/libexec/polkitd (No such file or directory)

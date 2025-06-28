@@ -4,9 +4,11 @@ FROM node:20-slim
 # Set working directory
 WORKDIR /app
 
-# Install dependencies and Chromium (headless-compatible)
+# Install dependencies and Google Chrome (more reliable than chromium)
 RUN apt-get update && apt-get install -y \
-    chromium \
+    curl \
+    gnupg \
+    ca-certificates \
     fonts-liberation \
     libappindicator3-1 \
     libasound2 \
@@ -24,16 +26,26 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     libgbm1 \
     --no-install-recommends && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/*
+
+# Install Google Chrome directly
+RUN curl -sSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg && \
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list && \
+    apt-get update && apt-get install -y google-chrome-stable && \
+    rm -rf /var/lib/apt/lists/*
 
 # Environment variables
 ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PORT=8080
 ENV FIREBASE_SERVICE_ACCOUNT=""
 # FIREBASE_SERVICE_ACCOUNT will be set at runtime via Cloud Run environment variables
 
+
+# Verify Google Chrome installation
+RUN google-chrome-stable --version && \
+    ls -la /usr/bin/google-chrome-stable
 
 # Copy package files
 COPY package*.json ./

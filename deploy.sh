@@ -49,7 +49,7 @@ echo "✅ Firebase service account loaded from .env file (${#FIREBASE_SERVICE_AC
 # Create env vars file to avoid shell escaping issues
 cat > /tmp/env-vars.yaml << EOF
 NODE_ENV: production
-PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
 FIREBASE_SERVICE_ACCOUNT: |
   ${FIREBASE_SERVICE_ACCOUNT}
 EOF
@@ -72,7 +72,7 @@ echo "✅ Firebase service account loaded from .env file (${#FIREBASE_SERVICE_AC
 # Create env vars file to avoid shell escaping issues
 cat > /tmp/env-vars.yaml << EOF
 NODE_ENV: production
-PUPPETEER_EXECUTABLE_PATH: /usr/bin/chromium
+PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
 FIREBASE_SERVICE_ACCOUNT: |
   ${FIREBASE_SERVICE_ACCOUNT}
 EOF

@@ -12,10 +12,12 @@ export class PuppeteerConfig {
     // Create unique userDataDir for each browser launch to prevent conflicts
     const userDataDir = join(tmpdir(), `chrome-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     
-    return {
+    const config = {
       headless: true,
+      timeout: 90000, // Increase timeout even more for debugging
+      pipe: true, // CRITICAL: Use pipe instead of WebSocket - fixes WS endpoint timeout
       userDataDir, // Critical: unique directory prevents zombie processes
-      executablePath: isCloudRun ? '/usr/bin/chromium' : this.findLocalChrome(),
+      executablePath: isCloudRun ? '/usr/bin/google-chrome-stable' : this.findLocalChrome(),
       args: [
         '--no-sandbox',
         '--disable-gpu',
@@ -23,9 +25,25 @@ export class PuppeteerConfig {
         '--disable-setuid-sandbox',
         '--no-zygote',
         '--single-process',
-        '--headless=new'
+        '--headless=new',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-ipc-flooding-protection',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-default-apps',
+        '--no-first-run',
+        '--memory-pressure-off'
       ]
     };
+    
+    console.log(`🔧 Puppeteer config created with pipe=${config.pipe}, timeout=${config.timeout}`);
+    console.log(`🎯 Using Chrome executable: ${config.executablePath}`);
+    console.log(`📋 Chrome args: ${config.args.join(' ')}`);
+    return config;
   }
 
   /**
