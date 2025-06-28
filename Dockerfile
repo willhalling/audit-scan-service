@@ -43,6 +43,9 @@ ENV FIREBASE_SERVICE_ACCOUNT=""
 # FIREBASE_SERVICE_ACCOUNT will be set at runtime via Cloud Run environment variables
 
 
+# Install dumb-init for proper signal handling and zombie reaping
+RUN apt-get update && apt-get install -y dumb-init && rm -rf /var/lib/apt/lists/*
+
 # Verify Google Chrome installation
 RUN google-chrome-stable --version && \
     ls -la /usr/bin/google-chrome-stable
@@ -66,5 +69,6 @@ RUN npm prune --production
 # Expose the port Cloud Run expects
 EXPOSE 8080
 
-# Start the app
+# Start the app with dumb-init for proper signal handling
+ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js"]

@@ -80,7 +80,7 @@ export class ScrapeService {
       textToHtmlRatio,
       headers,
       hasSingleH1,
-      screenshots: [] // Will be populated by screenshot service
+      screenshots: {} // Will be populated by screenshot service
     };
   }
 }

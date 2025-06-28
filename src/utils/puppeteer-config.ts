@@ -27,7 +27,7 @@ export class PuppeteerConfig {
         '--single-process',
         '--headless=new',
         '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
+        '--disable-features=VizDisplayCompositor,HttpsFirstBalancedModeAutoEnable',
         '--disable-ipc-flooding-protection',
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
@@ -36,7 +36,10 @@ export class PuppeteerConfig {
         '--disable-plugins',
         '--disable-default-apps',
         '--no-first-run',
-        '--memory-pressure-off'
+        '--memory-pressure-off',
+        '--disable-notifications',
+        '--disable-component-extensions-with-background-pages',
+        '--disable-background-networking'
       ]
     };
     

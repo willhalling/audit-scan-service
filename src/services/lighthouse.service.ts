@@ -76,7 +76,16 @@ export class LighthouseService {
             '--disable-dev-shm-usage',
             '--disable-setuid-sandbox',
             '--no-zygote',
-            '--single-process'
+            // Remove --single-process for Lighthouse compatibility
+            '--disable-features=VizDisplayCompositor,HttpsFirstBalancedModeAutoEnable',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-extensions',
+            '--disable-default-apps',
+            '--no-first-run',
+            '--disable-notifications'
+            // Note: Removed --disable-web-security and other aggressive flags that break Lighthouse
           ],
           chromePath: chromePath,
           startingUrl: 'about:blank',

@@ -198,7 +198,7 @@ export class AuditService {
         console.log(`📊 Final screenshots (3 total):`, allScreenshots);
         
         // Add screenshots to page
-        pageData.screenshots = [allScreenshots];
+        pageData.screenshots = allScreenshots;
         console.log(`✅ Screenshots added to pageData:`, pageData.screenshots);
       }
 

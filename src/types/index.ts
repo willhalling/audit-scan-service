@@ -194,7 +194,7 @@ export interface PageData {
   textToHtmlRatio: number;
   headers: PageHeaders;
   hasSingleH1: boolean;
-  screenshots: PageScreenshots[];
+  screenshots: PageScreenshots;
   wordCount?: number;
   socialAnalysis?: SocialAnalysis;
   accessibility?: {
