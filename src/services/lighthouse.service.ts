@@ -6,6 +6,8 @@ import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 export class LighthouseService {
   private static queue: Array<() => Promise<any>> = [];
   private static isProcessing = false;
+  private static activeChrome: any = null; // Track active Chrome instance
+  private static processingUrl: string | null = null; // Track what's being processed
   private static readonly DESKTOP_CONFIG = {
     extends: 'lighthouse:default',
     settings: {
@@ -30,17 +32,29 @@ export class LighthouseService {
 
   private static async processQueue(): Promise<void> {
     if (this.isProcessing || this.queue.length === 0) {
+      console.log(`🔄 Queue status: processing=${this.isProcessing}, queue length=${this.queue.length}`);
       return;
     }
 
     this.isProcessing = true;
+    console.log(`🚀 Starting Lighthouse queue processing, ${this.queue.length} tasks in queue`);
+    
     while (this.queue.length > 0) {
       const task = this.queue.shift();
       if (task) {
-        await task();
+        try {
+          await task();
+        } catch (error) {
+          console.error('❌ Task in Lighthouse queue failed:', error);
+        }
+        // Add a small delay between tasks to prevent race conditions
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
+    
     this.isProcessing = false;
+    this.processingUrl = null;
+    console.log(`✅ Lighthouse queue processing complete`);
   }
 
   private static queueLighthouse<T>(task: () => Promise<T>): Promise<T> {
@@ -59,10 +73,22 @@ export class LighthouseService {
 
   static async runLighthouse(config: LighthouseConfig): Promise<LighthouseResult> {
     return this.queueLighthouse(async () => {
+      // Check if there's already a Chrome instance running
+      if (this.activeChrome) {
+        console.log('⚠️ Cleaning up existing Chrome instance before starting new Lighthouse scan...');
+        try {
+          await this.activeChrome.kill();
+        } catch (error) {
+          console.log('⚠️ Error killing existing Chrome:', error);
+        }
+        this.activeChrome = null;
+      }
+
       let chrome: any = null;
+      this.processingUrl = config.url;
       
       try {
-        console.log('🚀 Launching Chrome for Lighthouse...');
+        console.log(`🚀 Starting Lighthouse for: ${config.url}`);
         
         // Get the Chrome path from PuppeteerConfig (with smart detection)
         const chromePath = await PuppeteerConfig.getChromePath();
@@ -93,6 +119,7 @@ export class LighthouseService {
           logLevel: 'error'
         });
         
+        this.activeChrome = chrome; // Track the active instance
         console.log(`✅ Chrome launched successfully on port ${chrome.port}`);
         
         const options = {
@@ -172,6 +199,13 @@ export class LighthouseService {
             console.error('⚠️ Error killing Chrome process:', killError);
           }
         }
+        
+        // Clear tracking variables
+        this.activeChrome = null;
+        this.processingUrl = null;
+        
+        // Force garbage collection of Chrome processes if any are left
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
     });
   }
@@ -189,5 +223,17 @@ export class LighthouseService {
       categories: result.categories,
       audits: result.audits
     };
+  }
+
+  static isRunning(): boolean {
+    return this.isProcessing;
+  }
+
+  static getCurrentProcessingUrl(): string | null {
+    return this.processingUrl;
+  }
+
+  static getQueueLength(): number {
+    return this.queue.length;
   }
 }
