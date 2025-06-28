@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import * as chromeLauncher from 'chrome-launcher';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 

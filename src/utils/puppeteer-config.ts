@@ -1,4 +1,4 @@
-import { LaunchOptions } from 'puppeteer';
+import { existsSync } from 'fs';
 
 export class PuppeteerConfig {
   /**
@@ -6,22 +6,88 @@ export class PuppeteerConfig {
    * Uses system Chromium for maximum compatibility
    */
   static async getLaunchOptions(): Promise<any> {
-    console.log('🔍 Using system Chromium configuration');
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isCloudRun = !!process.env.K_SERVICE; // Cloud Run sets this environment variable
+    const isContainer = !!process.env.KUBERNETES_SERVICE_HOST || !!process.env.K_SERVICE;
     
-    // Force use of system Chromium
-    const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
-    console.log(`🎯 Chromium executable path: ${executablePath}`);
-    
+    console.log(`🔍 Environment: ${isProduction ? 'production' : 'development'}, Cloud Run: ${isCloudRun}, Container: ${isContainer}`);
+
     const launchOptions: any = {
-      headless: 'new',
-      timeout: 30000, // Reduced timeout to fail faster
-      args: this.getSystemChromiumArgs(),
-      executablePath: executablePath,
-      defaultViewport: { width: 1280, height: 720 }, // Add explicit viewport
-      handleSIGINT: false // Don't handle signals in container
+      headless: true,
+      timeout: 30000,
+      defaultViewport: { width: 1280, height: 720 },
+      handleSIGINT: false
     };
 
+    // puppeteer-core always requires an executablePath
+    let executablePath: string;
+    
+    if (isContainer || isCloudRun || (isProduction && process.env.PUPPETEER_EXECUTABLE_PATH)) {
+      // Use system Chromium in Cloud Run/production/container environments
+      executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
+      console.log(`🎯 Container/Production Chromium executable path: ${executablePath}`);
+      launchOptions.args = this.getSystemChromiumArgs();
+      
+      // Verify the executable exists in container environments
+      if (!existsSync(executablePath)) {
+        console.error(`❌ Chromium not found at ${executablePath}`);
+        console.log('📋 Container troubleshooting:');
+        console.log('1. Ensure Dockerfile installs chromium');
+        console.log('2. Set PUPPETEER_EXECUTABLE_PATH correctly');
+        console.log('3. Check if chromium package is available');
+        throw new Error(`Chromium executable not found at ${executablePath}. Check Docker container setup.`);
+      }
+    } else {
+      // For local development, try to find Chrome/Chromium
+      executablePath = this.findLocalChrome();
+      console.log(`🏠 Local Chrome executable path: ${executablePath}`);
+      launchOptions.args = this.getLocalChromiumArgs();
+    }
+    
+    launchOptions.executablePath = executablePath;
+    console.log(`🚀 Final launch config: executablePath=${executablePath}, args=${JSON.stringify(launchOptions.args)}`);
     return launchOptions;
+  }
+
+  /**
+   * Find Chrome executable on local machine
+   */
+  private static findLocalChrome(): string {
+    // Check if environment variable is set
+    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+      return process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    
+    // Try common Chrome locations for macOS
+    const macPaths = [
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+      '/Applications/Chromium.app/Contents/MacOS/Chromium',
+      '/usr/bin/google-chrome-stable',
+      '/usr/bin/google-chrome',
+      '/usr/bin/chromium-browser',
+      '/usr/bin/chromium'
+    ];
+    
+    // Use synchronous fs check
+    for (const path of macPaths) {
+      try {
+        if (existsSync(path)) {
+          console.log(`✅ Found Chrome at: ${path}`);
+          return path;
+        }
+      } catch (error) {
+        // Continue to next path
+      }
+    }
+    
+    // If no Chrome found, throw an error with helpful message
+    throw new Error(`Chrome/Chromium not found. Please install Chrome or set PUPPETEER_EXECUTABLE_PATH environment variable.
+Tried paths:
+${macPaths.join('\n')}
+
+To fix this, either:
+1. Install Google Chrome from https://www.google.com/chrome/
+2. Set PUPPETEER_EXECUTABLE_PATH environment variable to your Chrome path`);
   }
 
   /**
@@ -30,7 +96,7 @@ export class PuppeteerConfig {
   static async getAlternativeLaunchOptions(): Promise<any> {
     console.log('🔄 Using minimal Chromium configuration');
     const launchOptions: any = {
-      headless: 'new',
+      headless: true,
       timeout: 30000, // Reduced timeout to fail faster
       args: [
         '--headless',
@@ -56,16 +122,27 @@ export class PuppeteerConfig {
    */
   private static getSystemChromiumArgs(): string[] {
     return [
-      '--headless',
-      '--no-sandbox',
+      '--disable-dev-shm-usage',       // fixes /dev/shm too small issue
       '--disable-gpu',
-      '--disable-dev-shm-usage',
       '--disable-setuid-sandbox',
+      '--no-sandbox',
       '--no-zygote',
       '--single-process',
-      '--remote-debugging-port=0', // Let Puppeteer assign port dynamically
-      '--enable-logging',
-      '--log-level=0'
+      '--headless=new'                 // 👈 especially important for newer Chrome
+    ];
+  }
+
+  /**
+   * Get local Chromium arguments for development
+   * More permissive flags for local development
+   */
+  private static getLocalChromiumArgs(): string[] {
+    return [
+      '--headless=new',
+      '--disable-gpu',
+      '--disable-dev-shm-usage',
+      '--no-sandbox',
+      '--disable-setuid-sandbox'
     ];
   }
 
@@ -94,5 +171,19 @@ export class PuppeteerConfig {
       '--disable-features=TranslateUI',
       '--disable-sync'
     ];
+  }
+
+  /**
+   * Get the Chrome executable path for the current environment
+   */
+  static async getChromePath(): Promise<string> {
+    const isProduction = process.env.NODE_ENV === 'production';
+    const isCloudRun = !!process.env.K_SERVICE;
+    
+    if (isCloudRun || isProduction) {
+      return process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
+    } else {
+      return this.findLocalChrome();
+    }
   }
 }

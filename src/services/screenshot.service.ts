@@ -1,4 +1,4 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import { ScreenshotOptions, PageScreenshots } from '../types/index.js';
 import { StorageService } from './storage.service.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';

@@ -34,9 +34,11 @@ export class LighthouseService {
             let chrome = null;
             try {
                 console.log('🚀 Launching Chrome for Lighthouse...');
+                const chromePath = await PuppeteerConfig.getChromePath();
+                console.log(`🎯 Using Chrome path for Lighthouse: ${chromePath}`);
                 chrome = await chromeLauncher.launch({
                     chromeFlags: await PuppeteerConfig.getChromeLauncherFlags(),
-                    chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+                    chromePath: chromePath,
                     startingUrl: 'about:blank',
                     handleSIGINT: false,
                     logLevel: 'error'

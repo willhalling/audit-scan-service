@@ -4,7 +4,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import UserAgent from 'user-agents';
 import pRetry from 'p-retry';
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import sharp from 'sharp';
@@ -106,7 +106,7 @@ async function validateLinks(links, baseUrl) {
         }
       });
   });
-  
+
   await Promise.all(checkLinkPromises);
   return results;
 }
@@ -114,7 +114,7 @@ async function validateLinks(links, baseUrl) {
 // Lighthouse endpoint
 app.post('/lighthouse', async (req, res) => {
   const { url, strategy, useDesktop } = req.body;
-  
+
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
@@ -122,7 +122,7 @@ app.post('/lighthouse', async (req, res) => {
   // Handle both parameter formats: strategy OR useDesktop
   const isDesktop = strategy === 'desktop' || useDesktop === true || strategy === undefined;
   const cleanUrl = url.startsWith('http') ? url : `https://${url}`;
-  
+
   console.log(`🔍 POST Lighthouse scan request for ${isDesktop ? 'desktop' : 'mobile'}:`, cleanUrl);
 
   let chrome;
@@ -190,7 +190,7 @@ app.post('/lighthouse', async (req, res) => {
           deviceScaleFactor: isDesktop ? 1 : 2,
           disabled: false
         },
-        emulatedUserAgent: isDesktop 
+        emulatedUserAgent: isDesktop
           ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
           : 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1'
       }
@@ -218,9 +218,9 @@ app.post('/lighthouse', async (req, res) => {
     res.json(result);
   } catch (error) {
     console.error('❌ Lighthouse analysis failed:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Lighthouse analysis failed',
-      message: error.message 
+      message: error.message
     });
   } finally {
     if (chrome) {
@@ -232,7 +232,7 @@ app.post('/lighthouse', async (req, res) => {
 // Lighthouse endpoint
 app.get('/lighthouse', async (req, res) => {
   const { host, uid, docId } = req.query;
-  
+
   console.log('🔍 Lighthouse scan request:', { host, uid, docId });
 
   if (!host) {
@@ -245,10 +245,10 @@ app.get('/lighthouse', async (req, res) => {
 
   let chrome;
   const timeoutMs = 120000; // 2 minutes timeout
-  
+
   try {
     console.log('✅ Starting Lighthouse scan for:', host);
-    
+
     const url = host.startsWith('http') ? host : `https://${host}`;
     console.log('🚀 Running Lighthouse on:', url);    // Wrap the entire operation in a timeout
     const lighthouseOperation = async () => {
@@ -286,10 +286,10 @@ app.get('/lighthouse', async (req, res) => {
       // Add retry logic for Lighthouse execution
       const lighthouseResult = await pRetry(async () => {
         console.log('🔄 Attempting Lighthouse scan...');
-        
+
         // Additional wait before starting Lighthouse
         await new Promise(resolve => setTimeout(resolve, 1000));
-        
+
         return await lighthouse(url, {
           port: chrome.port,
           output: 'json',
@@ -339,7 +339,7 @@ app.get('/lighthouse', async (req, res) => {
     // Execute with timeout
     const lighthouseResult = await Promise.race([
       lighthouseOperation(),
-      new Promise((_, reject) => 
+      new Promise((_, reject) =>
         setTimeout(() => reject(new Error('Lighthouse scan timed out after 2 minutes')), timeoutMs)
       )
     ]);
@@ -438,7 +438,7 @@ app.get('/lighthouse', async (req, res) => {
 // Scrape endpoint  
 app.get('/scrape', async (req, res) => {
   const { host, uid, docId, mode = 'full', customSubpages } = req.query;
-  
+
   console.log('🚀 Website scraping request:', { host, uid, docId, mode });
 
   if (!host) {
@@ -460,7 +460,7 @@ app.get('/scrape', async (req, res) => {
     }
 
     const scrapeData = await scrapeWebsiteData(url, mode, subpagesToScan);
-    
+
     console.log('🎉 Website scraping completed successfully!');
     res.json({
       success: true,
@@ -481,7 +481,7 @@ app.get('/scrape', async (req, res) => {
 // Screenshot endpoint
 app.get('/screenshot', async (req, res) => {
   const { host, uid, docId, width, height, fullPage } = req.query;
-  
+
   console.log('📸 Screenshot request:', { host, uid, docId, width, height, fullPage });
 
   if (!host) {
@@ -491,9 +491,14 @@ app.get('/screenshot', async (req, res) => {
   let browser;
   try {
     console.log('✅ Starting screenshot capture for:', host);
-    
+
     browser = await puppeteer.launch({
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-web-security'],
+      args: ['--no-sandbox',
+        '--disable-gpu',
+        '--disable-dev-shm-usage',
+        '--disable-setuid-sandbox',
+        '--no-zygote',
+        '--single-process'],
       headless: true,
     });
 
@@ -543,7 +548,7 @@ app.get('/screenshot', async (req, res) => {
 // Accessibility scanning endpoint
 app.get('/accessibility', async (req, res) => {
   const { host, uid, docId, skipFirestore, screenshotWidth, screenshotHeight, deviceType } = req.query;
-  
+
   console.log('🔍 Accessibility scan request:', { host, uid, docId, skipFirestore, deviceType });
 
   if (!host) {
@@ -574,7 +579,7 @@ app.get('/accessibility', async (req, res) => {
     // Extract viewport dimensions
     const viewportWidth = screenshotWidth ? parseInt(screenshotWidth) : 1366;
     const viewportHeight = screenshotHeight ? parseInt(screenshotHeight) : 850;
-    
+
     // Set viewport size and mobile emulation if needed
     if (deviceType === 'mobile') {
       await page.setViewport({
@@ -584,7 +589,7 @@ app.get('/accessibility', async (req, res) => {
         hasTouch: true,
         deviceScaleFactor: 2
       });
-      
+
       await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_7_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1');
       console.log(`✅ Step 2 Complete: Mobile page created with viewport ${viewportWidth}x${viewportHeight}`);
     } else {
@@ -647,28 +652,28 @@ app.get('/accessibility', async (req, res) => {
 
     console.log('🚀 Step 6: Getting element coordinates for annotation...');
     let elementCoordinates = [];
-    
+
     if (axeResults.violations && axeResults.violations.length > 0) {
       try {
         await page.evaluate(() => {
           window.scrollTo(0, 0);
         });
-        
+
         await page.waitForTimeout(500);
-        
+
         const visualViolations = axeResults.violations.filter((violation) => {
           const skipIds = [
-            'document-title', 'html-has-lang', 'meta-viewport', 
+            'document-title', 'html-has-lang', 'meta-viewport',
             'landmark-one-main', 'region', 'page-has-heading-one'
           ];
           return !skipIds.includes(violation.id);
         });
-        
+
         console.log('📍 Visual violations to process:', visualViolations.length);
-        
+
         elementCoordinates = await page.evaluate((violations) => {
           const coords = [];
-          
+
           violations.forEach((violation) => {
             violation.nodes.forEach((node) => {
               const selectors = Array.isArray(node.target) ? node.target : [node.target];
@@ -681,7 +686,7 @@ app.get('/accessibility', async (req, res) => {
                       if (rect.width > 0 && rect.height > 0) {
                         const absoluteX = rect.left + window.pageXOffset;
                         const absoluteY = rect.top + window.pageYOffset;
-                        
+
                         coords.push({
                           x: absoluteX + rect.width / 2,
                           y: absoluteY + rect.height / 2,
@@ -698,10 +703,10 @@ app.get('/accessibility', async (req, res) => {
               });
             });
           });
-          
+
           return coords;
         }, visualViolations || []);
-        
+
         console.log('✅ Step 6 Complete: Got coordinates for', elementCoordinates.length, 'elements');
       } catch (error) {
         console.error('❌ Step 6 Failed: Coordinate extraction error:', error);
@@ -717,7 +722,7 @@ app.get('/accessibility', async (req, res) => {
         fullPage: true,
         type: 'png'
       });
-      
+
       let screenshotHeight;
       if (deviceType === 'mobile') {
         const pdfRedBoxAspectRatio = 0.4012;
@@ -725,7 +730,7 @@ app.get('/accessibility', async (req, res) => {
       } else {
         screenshotHeight = Math.floor(viewportWidth * 0.65);
       }
-      
+
       topPortionScreenshot = await page.screenshot({
         fullPage: false,
         clip: {
@@ -800,7 +805,7 @@ app.get('/accessibility', async (req, res) => {
 // Main scraping function that handles the full website analysis
 async function scrapeWebsiteData(url, mode = 'full', customSubpages = []) {
   console.log('🔍 Starting comprehensive website scraping:', { url, mode });
-  
+
   const scrapeHeaders = generateHeaders();
   const response = await axios.get(url, { headers: scrapeHeaders, timeout: 30000 });
   const $ = cheerio.load(response.data);
@@ -816,7 +821,7 @@ async function scrapeWebsiteData(url, mode = 'full', customSubpages = []) {
 
   // Extract links
   const links = $('a[href]').map((_, el) => $(el).attr('href')).get();
-  
+
   // Extract images
   const images = $('img').map((_, el) => ({
     src: $(el).attr('src') || '',
@@ -876,7 +881,7 @@ async function scrapeWebsiteData(url, mode = 'full', customSubpages = []) {
   let pages = [];
   if (mode === 'full' || mode === 'custom') {
     let urlsToScan = [];
-    
+
     if (mode === 'custom' && customSubpages && customSubpages.length > 0) {
       urlsToScan = customSubpages.map(page => page.startsWith('http') ? page : new URL(page, url).href);
     } else {
@@ -887,13 +892,13 @@ async function scrapeWebsiteData(url, mode = 'full', customSubpages = []) {
           try {
             const linkUrl = new URL(link, url);
             return linkUrl.hostname === baseUrl.hostname &&
-                   !EXCLUDED_PAGES.some(excluded => link.toLowerCase().includes(excluded));
+              !EXCLUDED_PAGES.some(excluded => link.toLowerCase().includes(excluded));
           } catch {
             return false;
           }
         })
         .slice(0, MAX_PAGES - 1); // -1 because we already have the main page
-      
+
       urlsToScan = internalLinks.map(link => new URL(link, url).href);
     }
 
@@ -902,7 +907,7 @@ async function scrapeWebsiteData(url, mode = 'full', customSubpages = []) {
       try {
         const pageResponse = await axios.get(pageUrl, { headers: scrapeHeaders, timeout: 30000 });
         const page$ = cheerio.load(pageResponse.data);
-        
+
         pages.push({
           url: pageUrl,
           title: page$('title').text().trim(),
@@ -982,11 +987,11 @@ async function annotateScreenshot(screenshot, violations, elementCoordinates = [
     limitedElementCoordinates.forEach((coord, index) => {
       const x = Math.max(25, Math.min(width - 25, coord.x));
       const y = Math.max(25, Math.min(height - 25, coord.y));
-      
+
       const color = getImpactColor(coord.impact);
 
       annotations.push(`
-        <rect x="${x - coord.width/2}" y="${y - coord.height/2}" width="${coord.width}" height="${coord.height}" 
+        <rect x="${x - coord.width / 2}" y="${y - coord.height / 2}" width="${coord.width}" height="${coord.height}" 
               fill="none" stroke="${color}" stroke-width="2" opacity="0.3"/>
         <circle cx="${x}" cy="${y}" r="25" fill="${color}" stroke="white" stroke-width="4" opacity="0.9"/>
         <text x="${x}" y="${y + 6}" text-anchor="middle" fill="white" font-size="16" font-weight="bold">${index + 1}</text>
