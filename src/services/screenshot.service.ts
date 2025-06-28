@@ -35,6 +35,9 @@ export class ScreenshotService {
   private static async attemptScreenshot(options: ScreenshotOptions): Promise<Buffer> {
     let lastError: Error | null = null;
     
+    // Clean up any leftover browser processes first
+    await PuppeteerConfig.forceCleanupBrowsers();
+    
     // Try main configuration first, then alternative if it fails
     const configurations = [
       await PuppeteerConfig.getLaunchOptions(),
@@ -94,7 +97,16 @@ export class ScreenshotService {
 
           return screenshot as Buffer;
         } finally {
-          await browser.close();
+          // Ensure browser is properly closed
+          try {
+            console.log('🔄 Closing browser...');
+            await browser.close();
+            console.log('✅ Browser closed successfully');
+          } catch (closeError) {
+            console.warn('⚠️ Error closing browser:', closeError);
+            // Force cleanup if normal close fails
+            await PuppeteerConfig.forceCleanupBrowsers();
+          }
         }
       } catch (error) {
         console.error(`❌ Screenshot attempt ${i + 1} failed:`, error);

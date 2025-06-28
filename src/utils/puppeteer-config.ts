@@ -15,7 +15,7 @@ export class PuppeteerConfig {
 
     const launchOptions: any = {
       headless: true,
-      timeout: 30000,
+      timeout: 15000, // Reduced timeout - fail faster in containers
       defaultViewport: { width: 1280, height: 720 },
       handleSIGINT: false
     };
@@ -129,7 +129,16 @@ To fix this, either:
       '--no-sandbox',
       '--no-zygote',
       '--single-process',
-      '--headless=new'                 // 👈 especially important for newer Chrome
+      '--headless=new',                // 👈 especially important for newer Chrome
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-default-apps',
+      '--no-first-run',
+      '--memory-pressure-off',         // Disable memory pressure checks
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-features=VizDisplayCompositor'
     ];
   }
 
@@ -212,6 +221,41 @@ To fix this, either:
         error: error instanceof Error ? error.message : 'Unknown error',
         path: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
       };
+    }
+  }
+
+  /**
+   * Aggressively clean up any leftover Chrome/Chromium processes
+   */
+  static async forceCleanupBrowsers(): Promise<void> {
+    try {
+      console.log('🧹 Force cleaning up browser processes...');
+      
+      // Kill any leftover chromium processes
+      const { exec } = await import('child_process');
+      
+      await new Promise<void>((resolve) => {
+        exec('pkill -f chromium || pkill -f chrome || true', (error) => {
+          if (error) {
+            console.log('⚠️ Some processes could not be killed (this is usually fine)');
+          } else {
+            console.log('✅ Browser processes cleaned up');
+          }
+          resolve();
+        });
+      });
+
+      // Wait a moment for processes to actually die
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Try to clean up shared memory
+      await new Promise<void>((resolve) => {
+        exec('rm -rf /tmp/.org.chromium.* 2>/dev/null || true', () => resolve());
+      });
+
+      console.log('🧹 Cleanup complete');
+    } catch (error) {
+      console.log('⚠️ Cleanup failed, but continuing:', error);
     }
   }
 }
