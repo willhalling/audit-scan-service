@@ -4,6 +4,9 @@ import { StorageService } from './storage.service.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class ScreenshotService {
+  private static queue: Array<() => Promise<any>> = [];
+  private static isProcessing = false;
+  
   // Screenshot dimensions for different use cases
   static readonly DIMENSIONS = {
     DESKTOP: { width: 1920, height: 1080 },
@@ -14,6 +17,22 @@ export class ScreenshotService {
   };
 
   static async takeScreenshot(options: ScreenshotOptions): Promise<Buffer> {
+    // Add a hard timeout to prevent indefinite hanging
+    const timeoutPromise = new Promise<Buffer>((_, reject) => {
+      setTimeout(() => reject(new Error('Screenshot timeout after 45 seconds')), 45000);
+    });
+
+    const screenshotPromise = this.attemptScreenshot(options);
+    
+    try {
+      return await Promise.race([screenshotPromise, timeoutPromise]);
+    } catch (error) {
+      console.error('❌ Screenshot failed with timeout or error:', error);
+      throw error;
+    }
+  }
+
+  private static async attemptScreenshot(options: ScreenshotOptions): Promise<Buffer> {
     let lastError: Error | null = null;
     
     // Try main configuration first, then alternative if it fails
@@ -25,10 +44,16 @@ export class ScreenshotService {
     for (let i = 0; i < configurations.length; i++) {
       try {
         console.log(`📸 Attempting screenshot with config ${i + 1}/${configurations.length}`);
+        console.log(`🔧 Config: executablePath=${configurations[i].executablePath}, args=${JSON.stringify(configurations[i].args)}`);
+        
+        const launchStartTime = Date.now();
         const browser = await puppeteer.launch(configurations[i]);
+        console.log(`✅ Browser launched in ${Date.now() - launchStartTime}ms`);
 
         try {
+          const pageStartTime = Date.now();
           const page = await browser.newPage();
+          console.log(`📄 New page created in ${Date.now() - pageStartTime}ms`);
           
           if (options.viewport) {
             await page.setViewport(options.viewport);
@@ -36,7 +61,9 @@ export class ScreenshotService {
             await page.setViewport({ width: 1280, height: 720 });
           }
 
+          const gotoStartTime = Date.now();
           await page.goto(options.url, { waitUntil: 'networkidle2', timeout: 30000 });
+          console.log(`🌐 Page loaded in ${Date.now() - gotoStartTime}ms`);
 
           // Hide elements before screenshot if specified
           if (options.hideSelectors && options.hideSelectors.length > 0) {
@@ -50,10 +77,12 @@ export class ScreenshotService {
             }, options.hideSelectors);
           }
 
+          const screenshotStartTime = Date.now();
           const screenshot = await page.screenshot({
             fullPage: options.fullPage || false,
             type: 'png'
           });
+          console.log(`📸 Screenshot taken in ${Date.now() - screenshotStartTime}ms`);
 
           return screenshot as Buffer;
         } finally {
@@ -77,6 +106,41 @@ export class ScreenshotService {
     throw lastError || new Error('All screenshot attempts failed');
   }
 
+  private static async processQueue(): Promise<void> {
+    if (this.isProcessing || this.queue.length === 0) {
+      return;
+    }
+
+    this.isProcessing = true;
+    console.log(`📋 Processing screenshot queue (${this.queue.length} items)`);
+    
+    while (this.queue.length > 0) {
+      const task = this.queue.shift();
+      if (task) {
+        try {
+          await task();
+        } catch (error) {
+          console.error('❌ Queue task failed:', error);
+        }
+      }
+    }
+    this.isProcessing = false;
+  }
+
+  private static queueScreenshot<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.queue.push(async () => {
+        try {
+          const result = await task();
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      });
+      this.processQueue();
+    });
+  }
+
   static async takeAndUploadScreenshots(
     url: string, 
     auditId: string, 
@@ -88,8 +152,9 @@ export class ScreenshotService {
     const coverScreenshot = await this.takeScreenshot({
       url,
       viewport: { width: 1366, height: 850 }, // Updated size for desktop screenshot
-      fullPage: false,
-      hideSelectors: ['#CybotCookiebotDialog'] // Hide cookie dialog by default
+      fullPage: false
+      // Temporarily removed hideSelectors to test if this is causing the hang
+      // hideSelectors: ['#CybotCookiebotDialog'] // Hide cookie dialog by default
     });
 
     const desktopUrl = await StorageService.uploadScreenshot(

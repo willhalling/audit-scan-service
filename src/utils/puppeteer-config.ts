@@ -14,9 +14,11 @@ export class PuppeteerConfig {
     
     const launchOptions: any = {
       headless: 'new',
-      timeout: 120000,
+      timeout: 30000, // Reduced timeout to fail faster
       args: this.getSystemChromiumArgs(),
-      executablePath: executablePath
+      executablePath: executablePath,
+      defaultViewport: { width: 1280, height: 720 }, // Add explicit viewport
+      handleSIGINT: false // Don't handle signals in container
     };
 
     return launchOptions;
@@ -29,110 +31,68 @@ export class PuppeteerConfig {
     console.log('🔄 Using minimal Chromium configuration');
     const launchOptions: any = {
       headless: 'new',
-      timeout: 120000,
+      timeout: 30000, // Reduced timeout to fail faster
       args: [
+        '--headless',
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
-        '--disable-gpu'
+        '--disable-gpu',
+        '--remote-debugging-port=0',
+        '--enable-logging',
+        '--log-level=0'
       ]
     };
 
-    // Try to use system chromium
-    if (process.env.PUPPETEER_EXECUTABLE_PATH) {
-      launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
-    }
+    // Force use of system chromium
+    launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
 
     return launchOptions;
   }
 
   /**
    * Get system Chromium arguments optimized for Cloud Run
+   * Using exact same minimal flags that work for Chrome Launcher
    */
   private static getSystemChromiumArgs(): string[] {
     return [
-      // Essential flags for containerized environments
+      '--headless',
       '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      
-      // Stability flags
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-features=TranslateUI',
-      '--disable-extensions',
-      '--disable-default-apps',
-      '--disable-sync',
-      '--disable-translate',
-      
-      // Performance flags
-      '--hide-scrollbars',
-      '--mute-audio',
-      '--no-first-run',
       '--disable-gpu',
-      '--disable-software-rasterizer',
-      '--run-all-compositor-stages-before-draw',
-      
-      // Memory management
-      '--memory-pressure-off',
-      '--max_old_space_size=4096'
+      '--disable-dev-shm-usage',
+      '--disable-setuid-sandbox',
+      '--no-zygote',
+      '--single-process',
+      '--remote-debugging-port=0', // Let Puppeteer assign port dynamically
+      '--enable-logging',
+      '--log-level=0'
     ];
   }
 
   /**
    * Get Chrome launcher flags for Lighthouse
-   * These flags are specifically tuned for Chrome Launcher in containerized environments
+   * Using proven configuration for containerized environments like Cloud Run
    */
   static async getChromeLauncherFlags(): Promise<string[]> {
     return [
-      // Essential flags for containerized environments
+      '--headless',
       '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      
-      // Network and debugging flags for Chrome Launcher
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor',
-      '--remote-debugging-address=0.0.0.0',
-      '--remote-debugging-port=0', // Let Chrome choose an available port
       '--disable-gpu',
-      '--disable-software-rasterizer',
-      
-      // Stability flags
+      '--disable-dev-shm-usage',
+      '--disable-setuid-sandbox',
+      '--no-zygote',
+      '--single-process',
+      // Let Chrome Launcher handle the remote debugging port allocation
+      // '--remote-debugging-port=9222' removed to avoid port conflicts
+      // Additional stability flags for containers
+      '--disable-extensions',
+      '--disable-default-apps',
+      '--no-first-run',
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
       '--disable-features=TranslateUI',
-      '--disable-extensions',
-      '--disable-default-apps',
-      '--disable-sync',
-      '--disable-translate',
-      
-      // Performance flags
-      '--hide-scrollbars',
-      '--mute-audio',
-      '--no-first-run',
-      '--run-all-compositor-stages-before-draw',
-      
-      // Memory management
-      '--memory-pressure-off',
-      '--max_old_space_size=4096',
-      
-      // Additional flags for better containerized Chrome debugging
-      '--disable-background-networking',
-      '--disable-background-mode',
-      '--disable-client-side-phishing-detection',
-      '--disable-default-apps',
-      '--disable-hang-monitor',
-      '--disable-popup-blocking',
-      '--disable-prompt-on-repost',
-      '--disable-sync',
-      '--metrics-recording-only',
-      '--no-default-browser-check',
-      '--no-pings',
-      '--password-store=basic',
-      '--use-mock-keychain'
+      '--disable-sync'
     ];
   }
 }
