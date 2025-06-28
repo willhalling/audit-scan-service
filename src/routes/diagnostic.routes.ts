@@ -207,4 +207,31 @@ router.get('/browser-health', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * Chromium diagnostic endpoint
+ */
+router.get('/chromium-test', async (req: Request, res: Response) => {
+  try {
+    const testResult = await PuppeteerConfig.testChromiumLaunch();
+    
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      environment: {
+        NODE_ENV: process.env.NODE_ENV,
+        PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH,
+        K_SERVICE: process.env.K_SERVICE,
+        platform: process.platform
+      },
+      chromiumTest: testResult
+    };
+    
+    res.json(diagnostics);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Chromium test failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
 export default router;

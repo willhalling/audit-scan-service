@@ -1,4 +1,5 @@
 import { existsSync } from 'fs';
+import puppeteer from 'puppeteer-core';
 
 export class PuppeteerConfig {
   /**
@@ -184,6 +185,33 @@ To fix this, either:
       return process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium';
     } else {
       return this.findLocalChrome();
+    }
+  }
+
+  /**
+   * Test if Chromium can actually launch (diagnostic method)
+   */
+  static async testChromiumLaunch(): Promise<{ success: boolean; error?: string; path?: string }> {
+    try {
+      const config = await this.getLaunchOptions();
+      console.log(`🧪 Testing Chromium launch with path: ${config.executablePath}`);
+      
+      const browser = await puppeteer.launch({
+        ...config,
+        timeout: 10000 // Shorter timeout for testing
+      });
+      
+      await browser.close();
+      return { 
+        success: true, 
+        path: config.executablePath 
+      };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        path: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium'
+      };
     }
   }
 }

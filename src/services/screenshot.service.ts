@@ -47,23 +47,30 @@ export class ScreenshotService {
         console.log(`🔧 Config: executablePath=${configurations[i].executablePath}, args=${JSON.stringify(configurations[i].args)}`);
         
         const launchStartTime = Date.now();
+        console.log(`🚀 Launching browser...`);
         const browser = await puppeteer.launch(configurations[i]);
         console.log(`✅ Browser launched in ${Date.now() - launchStartTime}ms`);
 
         try {
           const pageStartTime = Date.now();
+          console.log(`📄 Creating new page...`);
           const page = await browser.newPage();
-          console.log(`📄 New page created in ${Date.now() - pageStartTime}ms`);
+          console.log(`✅ New page created in ${Date.now() - pageStartTime}ms`);
           
           if (options.viewport) {
+            console.log(`📐 Setting viewport: ${JSON.stringify(options.viewport)}`);
             await page.setViewport(options.viewport);
           } else {
-            await page.setViewport({ width: 1280, height: 720 });
+            console.log(`📐 Using default viewport`);
           }
 
-          const gotoStartTime = Date.now();
-          await page.goto(options.url, { waitUntil: 'networkidle2', timeout: 30000 });
-          console.log(`🌐 Page loaded in ${Date.now() - gotoStartTime}ms`);
+          console.log(`🌐 Navigating to: ${options.url}`);
+          const navStartTime = Date.now();
+          await page.goto(options.url, { 
+            waitUntil: 'domcontentloaded', 
+            timeout: 30000 
+          });
+          console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
 
           // Hide elements before screenshot if specified
           if (options.hideSelectors && options.hideSelectors.length > 0) {
@@ -77,12 +84,13 @@ export class ScreenshotService {
             }, options.hideSelectors);
           }
 
+          console.log(`📸 Taking screenshot...`);
           const screenshotStartTime = Date.now();
           const screenshot = await page.screenshot({
             fullPage: options.fullPage || false,
             type: 'png'
           });
-          console.log(`📸 Screenshot taken in ${Date.now() - screenshotStartTime}ms`);
+          console.log(`✅ Screenshot captured in ${Date.now() - screenshotStartTime}ms`);
 
           return screenshot as Buffer;
         } finally {
