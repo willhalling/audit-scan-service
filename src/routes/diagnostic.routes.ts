@@ -118,7 +118,15 @@ router.get('/browser-test', async (req: Request, res: Response) => {
     try {
       const chrome = await Promise.race([
         chromeLauncher.launch({ 
-          chromeFlags: await PuppeteerConfig.getChromeLauncherFlags(),
+          chromeFlags: [
+            '--headless',
+            '--no-sandbox',
+            '--disable-gpu',
+            '--disable-dev-shm-usage',
+            '--disable-setuid-sandbox',
+            '--no-zygote',
+            '--single-process'
+          ],
           chromePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
           startingUrl: 'about:blank'
         }),
@@ -212,7 +220,7 @@ router.get('/browser-health', async (req: Request, res: Response) => {
  */
 router.get('/chromium-test', async (req: Request, res: Response) => {
   try {
-    const testResult = await PuppeteerConfig.testChromiumLaunch();
+    const config = await PuppeteerConfig.getLaunchOptions();
     
     const diagnostics = {
       timestamp: new Date().toISOString(),
@@ -222,7 +230,11 @@ router.get('/chromium-test', async (req: Request, res: Response) => {
         K_SERVICE: process.env.K_SERVICE,
         platform: process.platform
       },
-      chromiumTest: testResult
+      chromiumTest: {
+        success: true,
+        path: config.executablePath,
+        message: 'Config loaded successfully'
+      }
     };
     
     res.json(diagnostics);

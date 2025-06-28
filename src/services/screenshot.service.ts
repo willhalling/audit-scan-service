@@ -33,97 +33,74 @@ export class ScreenshotService {
   }
 
   private static async attemptScreenshot(options: ScreenshotOptions): Promise<Buffer> {
-    let lastError: Error | null = null;
-    
     // Clean up any leftover browser processes first
-    await PuppeteerConfig.forceCleanupBrowsers();
+    await PuppeteerConfig.forceCleanup();
     
-    // Try main configuration first, then alternative if it fails
-    const configurations = [
-      await PuppeteerConfig.getLaunchOptions(),
-      await PuppeteerConfig.getAlternativeLaunchOptions()
-    ];
+    // Get the single, simplified configuration
+    const config = await PuppeteerConfig.getLaunchOptions();
     
-    for (let i = 0; i < configurations.length; i++) {
+    console.log(`📸 Taking screenshot with simplified config`);
+    console.log(`🔧 Config: executablePath=${config.executablePath}, args=${JSON.stringify(config.args)}`);
+    
+    const launchStartTime = Date.now();
+    console.log(`🚀 Launching browser...`);
+    const browser = await puppeteer.launch(config);
+    console.log(`✅ Browser launched in ${Date.now() - launchStartTime}ms`);
+
+    try {
+      const pageStartTime = Date.now();
+      console.log(`📄 Creating new page...`);
+      const page = await browser.newPage();
+      console.log(`✅ New page created in ${Date.now() - pageStartTime}ms`);
+      
+      if (options.viewport) {
+        console.log(`📐 Setting viewport: ${JSON.stringify(options.viewport)}`);
+        await page.setViewport(options.viewport);
+      } else {
+        console.log(`📐 Using default viewport`);
+      }
+
+      console.log(`🌐 Navigating to: ${options.url}`);
+      const navStartTime = Date.now();
+      await page.goto(options.url, { 
+        waitUntil: 'domcontentloaded', 
+        timeout: 60000 // Increased to match browser launch timeout
+      });
+      console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
+
+      // Hide elements before screenshot if specified
+      if (options.hideSelectors && options.hideSelectors.length > 0) {
+        await page.evaluate((selectors) => {
+          selectors.forEach((selector) => {
+            const el = document.querySelector(selector);
+            if (el) {
+              (el as HTMLElement).style.display = 'none';
+            }
+          });
+        }, options.hideSelectors);
+      }
+
+      console.log(`📸 Taking screenshot...`);
+      const screenshotStartTime = Date.now();
+      const screenshot = await page.screenshot({
+        fullPage: options.fullPage || false,
+        type: 'png'
+      });
+      console.log(`✅ Screenshot captured in ${Date.now() - screenshotStartTime}ms`);
+
+      return screenshot as Buffer;
+    } finally {
+      // Ensure browser is properly closed
       try {
-        console.log(`📸 Attempting screenshot with config ${i + 1}/${configurations.length}`);
-        console.log(`🔧 Config: executablePath=${configurations[i].executablePath}, args=${JSON.stringify(configurations[i].args)}`);
-        
-        const launchStartTime = Date.now();
-        console.log(`🚀 Launching browser...`);
-        const browser = await puppeteer.launch(configurations[i]);
-        console.log(`✅ Browser launched in ${Date.now() - launchStartTime}ms`);
-
-        try {
-          const pageStartTime = Date.now();
-          console.log(`📄 Creating new page...`);
-          const page = await browser.newPage();
-          console.log(`✅ New page created in ${Date.now() - pageStartTime}ms`);
-          
-          if (options.viewport) {
-            console.log(`📐 Setting viewport: ${JSON.stringify(options.viewport)}`);
-            await page.setViewport(options.viewport);
-          } else {
-            console.log(`📐 Using default viewport`);
-          }
-
-          console.log(`🌐 Navigating to: ${options.url}`);
-          const navStartTime = Date.now();
-          await page.goto(options.url, { 
-            waitUntil: 'domcontentloaded', 
-            timeout: 30000 
-          });
-          console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
-
-          // Hide elements before screenshot if specified
-          if (options.hideSelectors && options.hideSelectors.length > 0) {
-            await page.evaluate((selectors) => {
-              selectors.forEach((selector) => {
-                const el = document.querySelector(selector);
-                if (el) {
-                  (el as HTMLElement).style.display = 'none';
-                }
-              });
-            }, options.hideSelectors);
-          }
-
-          console.log(`📸 Taking screenshot...`);
-          const screenshotStartTime = Date.now();
-          const screenshot = await page.screenshot({
-            fullPage: options.fullPage || false,
-            type: 'png'
-          });
-          console.log(`✅ Screenshot captured in ${Date.now() - screenshotStartTime}ms`);
-
-          return screenshot as Buffer;
-        } finally {
-          // Ensure browser is properly closed
-          try {
-            console.log('🔄 Closing browser...');
-            await browser.close();
-            console.log('✅ Browser closed successfully');
-          } catch (closeError) {
-            console.warn('⚠️ Error closing browser:', closeError);
-            // Force cleanup if normal close fails
-            await PuppeteerConfig.forceCleanupBrowsers();
-          }
-        }
-      } catch (error) {
-        console.error(`❌ Screenshot attempt ${i + 1} failed:`, error);
-        lastError = error instanceof Error ? error : new Error('Unknown error');
-        
-        // If this is the last configuration, throw the error
-        if (i === configurations.length - 1) {
-          throw lastError;
-        }
-        
-        // Wait a bit before trying the next configuration
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        console.log('🔄 Closing browser...');
+        await browser.close();
+        console.log('✅ Browser closed successfully');
+      } catch (closeError) {
+        console.warn('⚠️ Error closing browser:', closeError);
+        // Force cleanup if normal close fails
+        await PuppeteerConfig.forceCleanup();
       }
     }
-    
-    // This shouldn't be reached, but just in case
-    throw lastError || new Error('All screenshot attempts failed');
   }
 
   private static async processQueue(): Promise<void> {
