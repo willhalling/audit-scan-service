@@ -17,7 +17,7 @@ export class AccessibilityService {
   // Accessibility screenshot dimensions (exact specs from requirements)
   static readonly DIMENSIONS = {
     DESKTOP: { width: 1046, height: 679 }, // Updated for annotated desktop screenshot
-    MOBILE: { width: 298, height: 742 }   // Mobile accessibility overview (rounded from 297.5)
+    MOBILE: { width: 596, height: 1484 }   // Exact mobile image dimensions needed
   };
 
   static async runAccessibilityAudit(
@@ -97,11 +97,55 @@ export class AccessibilityService {
         
         // Set viewport based on type with accessibility dimensions
         const viewportConfig = viewport === 'mobile' 
-          ? this.DIMENSIONS.MOBILE
-          : this.DIMENSIONS.DESKTOP;
+          ? { 
+              width: this.DIMENSIONS.MOBILE.width,   // 596px - actual image width
+              height: this.DIMENSIONS.MOBILE.height, // 1484px - actual image height
+              deviceScaleFactor: 1,
+              isMobile: true,  // Tell browser this is mobile
+              hasTouch: true   // Enable touch events for mobile
+            }
+          : { ...this.DIMENSIONS.DESKTOP, deviceScaleFactor: 1 };
           
         await page.setViewport(viewportConfig);
-        console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height}`);
+        console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height} (mobile: ${viewportConfig.isMobile || false})`);
+        
+        // Verify viewport was actually set correctly
+        const actualViewportAfterSet = await page.evaluate(() => ({
+          width: window.innerWidth,
+          height: window.innerHeight
+        }));
+        console.log(`♿ Actual viewport after setting: ${actualViewportAfterSet.width}x${actualViewportAfterSet.height}`);
+        
+        if (actualViewportAfterSet.width !== viewportConfig.width || actualViewportAfterSet.height !== viewportConfig.height) {
+          console.warn(`⚠️ Viewport mismatch! Expected: ${viewportConfig.width}x${viewportConfig.height}, Got: ${actualViewportAfterSet.width}x${actualViewportAfterSet.height}`);
+        }
+        
+        // For mobile, ensure proper responsive handling
+        if (viewport === 'mobile') {
+          // Set user agent to mobile to trigger responsive design
+          await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1');
+          
+          // Add viewport meta tag and force mobile CSS to apply at 596px width
+          await page.evaluateOnNewDocument(() => {
+            // Add viewport meta tag if not present
+            if (!document.querySelector('meta[name="viewport"]')) {
+              const meta = document.createElement('meta');
+              meta.name = 'viewport';
+              meta.content = 'width=device-width, initial-scale=1.0';
+              document.head.appendChild(meta);
+            }
+            
+            // Override CSS media queries to treat 596px as mobile
+            const style = document.createElement('style');
+            style.textContent = `
+              /* Force mobile styles to apply at 596px width */
+              @media (max-width: 768px) {
+                /* This will now apply to our 596px viewport */
+              }
+            `;
+            document.head.appendChild(style);
+          });
+        }
         
         // Navigate with longer timeout and better error handling
         await page.goto(url, { 
@@ -154,11 +198,51 @@ export class AccessibilityService {
 
         // Take screenshot with error handling
         try {
+          // Debug viewport and content dimensions
+          const viewportInfo = await page.evaluate(() => {
+            return {
+              viewport: {
+                width: window.innerWidth,
+                height: window.innerHeight
+              },
+              document: {
+                scrollWidth: document.documentElement.scrollWidth,
+                scrollHeight: document.documentElement.scrollHeight,
+                clientWidth: document.documentElement.clientWidth,
+                clientHeight: document.documentElement.clientHeight
+              },
+              body: {
+                scrollWidth: document.body.scrollWidth,
+                scrollHeight: document.body.scrollHeight,
+                clientWidth: document.body.clientWidth,
+                clientHeight: document.body.clientHeight
+              }
+            };
+          });
+          console.log(`📏 ${viewport} viewport info:`, JSON.stringify(viewportInfo, null, 2));
+          
           const elementCoordinates = await this.getElementCoordinates(page, violations);
+          
+          // Get actual viewport dimensions to ensure screenshot matches exactly
+          const actualViewport = await page.evaluate(() => ({
+            width: window.innerWidth,
+            height: window.innerHeight
+          }));
+          
+          console.log(`📸 Taking ${viewport} screenshot with exact dimensions`);
+          
+          // Take screenshot with exact viewport dimensions (no scaling/distortion)
           const screenshot = await page.screenshot({
             fullPage: false,
-            type: 'png'
+            type: 'png',
+            clip: {
+              x: 0,
+              y: 0,
+              width: actualViewport.width,   // Use actual viewport width
+              height: actualViewport.height  // Use actual viewport height
+            }
           });
+          console.log(`📐 ${viewport} screenshot: ${actualViewport.width}x${actualViewport.height} pixels (1:1 ratio, no distortion)`);
           
           const annotatedScreenshot = await this.annotateScreenshot(
             screenshot as Buffer,
@@ -256,6 +340,9 @@ export class AccessibilityService {
     
     const elementCoordinates = await page.evaluate((violations: any[]) => {
       const coords: Array<{x: number, y: number, width: number, height: number, impact: string}> = [];
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      let elementsOutsideViewport = 0;
       
       violations.forEach((violation: any) => {
         violation.nodes.forEach((node: any) => {
@@ -268,9 +355,17 @@ export class AccessibilityService {
                   elements.forEach((element: Element) => {
                     const rect = element.getBoundingClientRect();
                     if (rect.width > 0 && rect.height > 0) {
+                      const centerX = rect.left + rect.width / 2;
+                      const centerY = rect.top + rect.height / 2;
+                      
+                      // Check if element is outside viewport
+                      if (centerX < 0 || centerX > viewportWidth || centerY < 0 || centerY > viewportHeight) {
+                        elementsOutsideViewport++;
+                      }
+                      
                       coords.push({
-                        x: rect.left + rect.width / 2,
-                        y: rect.top + rect.height / 2,
+                        x: centerX,
+                        y: centerY,
                         width: rect.width,
                         height: rect.height,
                         impact: violation.impact
@@ -288,6 +383,7 @@ export class AccessibilityService {
         });
       });
       
+      console.log(`📍 Viewport: ${viewportWidth}x${viewportHeight}, Elements outside viewport: ${elementsOutsideViewport}/${coords.length}`);
       return coords;
     }, visualViolations);
     

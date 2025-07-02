@@ -122,10 +122,30 @@ export interface ElementCoordinate {
   impact: 'minor' | 'moderate' | 'serious' | 'critical';
 }
 
+export interface AIAnalysisSection {
+  analysis: string;
+  suggestions: string;
+}
+
+export interface AIAnalysis {
+  meta: {
+    title: AIAnalysisSection;
+    description: AIAnalysisSection;
+  };
+  content: {
+    heading: AIAnalysisSection;
+    cta: AIAnalysisSection;
+    tone: AIAnalysisSection;
+    readability: AIAnalysisSection;
+    intent: AIAnalysisSection;
+  };
+}
+
 export interface AuditRequest {
   url: string;
   pages?: string[]; // Array of up to 5 page paths (e.g. ['/about', '/contact'])
   authorUid?: string; // Optional author UID to associate with the audit
+  enableAI?: boolean; // Optional flag to enable/disable AI analysis (default: true)
 }
 
 export interface PageMeta {
@@ -234,6 +254,7 @@ export interface PageData {
   accessibilityDesktop?: { violations: ReducedAccessibilityViolation[] };
   accessibilityMobile?: { violations: ReducedAccessibilityViolation[] };
   wordCloudData?: WordCloudData[];
+  ai?: AIAnalysis;
 }
 
 export interface AuditResult {

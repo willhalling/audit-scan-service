@@ -31,9 +31,10 @@ if [ -f .env ]; then
   echo "Loading environment variables from .env file..."
   # Read the entire line and extract everything after the first =
   FIREBASE_SERVICE_ACCOUNT=$(grep "^FIREBASE_SERVICE_ACCOUNT=" .env | sed 's/^FIREBASE_SERVICE_ACCOUNT=//')
+  OPENAI_API_KEY=$(grep "^OPENAI_API_KEY=" .env | sed 's/^OPENAI_API_KEY=//' | sed "s/^'//" | sed "s/'$//")
 else
   echo "❌ ERROR: .env file not found!"
-  echo "Please create a .env file with FIREBASE_SERVICE_ACCOUNT variable"
+  echo "Please create a .env file with FIREBASE_SERVICE_ACCOUNT and OPENAI_API_KEY variables"
   exit 1
 fi
 
@@ -44,35 +45,21 @@ if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
   exit 1
 fi
 
+# Check if OPENAI_API_KEY was loaded
+if [ -z "$OPENAI_API_KEY" ]; then
+  echo "❌ ERROR: OPENAI_API_KEY not found in .env file!"
+  echo "Please add OPENAI_API_KEY='your-openai-api-key' to your .env file"
+  exit 1
+fi
+
 echo "✅ Firebase service account loaded from .env file (${#FIREBASE_SERVICE_ACCOUNT} characters)"
+echo "✅ OpenAI API key loaded from .env file (${#OPENAI_API_KEY} characters)"
 
 # Create env vars file to avoid shell escaping issues
 cat > /tmp/env-vars.yaml << EOF
 NODE_ENV: production
 PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
-FIREBASE_SERVICE_ACCOUNT: |
-  ${FIREBASE_SERVICE_ACCOUNT}
-EOF
-
-gcloud run deploy $SERVICE_NAME \
-  --image $IMAGE_WITH_TAG \
-  --platform managed \
-  --region $REGION \
-  --allow-unauthenticated \
-  --memory 16Gi \
-  --cpu 4 \
-  --timeout 300 \
-  --max-instances 10 \
-  --port 8080 \
-  --env-vars-file=/tmp/env-vars.yaml \
-  --min-instances 1
-
-echo "✅ Firebase service account loaded from .env file (${#FIREBASE_SERVICE_ACCOUNT} characters)"
-
-# Create env vars file to avoid shell escaping issues
-cat > /tmp/env-vars.yaml << EOF
-NODE_ENV: production
-PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
+OPENAI_API_KEY: ${OPENAI_API_KEY}
 FIREBASE_SERVICE_ACCOUNT: |
   ${FIREBASE_SERVICE_ACCOUNT}
 EOF
@@ -116,4 +103,4 @@ curl -s "$SERVICE_URL/health" | head -200
 
 echo ""
 echo "Fetching logs to help diagnose any startup issues..."
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$SERVICE_NAME" --limit=20 --format="value(textPayload)" --region=$REGION | head -20
+gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=$SERVICE_NAME" --limit=20 --format="value(textPayload)" | head -20

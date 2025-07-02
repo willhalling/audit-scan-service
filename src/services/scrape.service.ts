@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { generateHeaders } from '../utils/helpers.js';
+import { CTAS } from '../utils/constants.js';
 import { PageData, PageMeta, PageHeaders, WordCloudData } from '../types/index.js';
 
 export class ScrapeService {
@@ -29,10 +30,9 @@ export class ScrapeService {
   }
 
   static extractCTAs($: cheerio.CheerioAPI): string[] {
-    const ctaTexts = ['contact', 'buy', 'shop', 'get started', 'learn more', 'sign up', 'download'];
-    return $('a, button').filter((_, el) =>
-      ctaTexts.some(cta => $(el).text().toLowerCase().includes(cta))
-    ).map((_, el) => $(el).text().trim()).get().slice(0, 5);
+    return $('a, button').filter((_: any, el: any) =>
+      CTAS.some(cta => $(el).text().toLowerCase().includes(cta.toLowerCase()))
+    ).map((_, el) => $(el).text().trim()).get().slice(0, 5); // Extract, trim text content, and limit to 5
   }
 
   static extractBodyText($: cheerio.CheerioAPI): string {

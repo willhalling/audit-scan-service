@@ -26,7 +26,24 @@ export const CTAS = [
   'continue', 'proceed', 'next', 'back', 'finish', 'complete', 
   'submit', 'send', 'contact', 'follow us', 'like us', 'share', 
   'tweet', 'pin it', 'connect', 'join the conversation', 
-  'join the community', 'join the club'
+  'join the community', 'join the club',
+
+   // Ecommerce / Retail
+  'add to cart', 'checkout', 'buy now', 'shop now', 'view deal', 'save now',
+  'claim offer', 'grab deal', 'see offer', 'lock in', 'get deal',
+
+  // SaaS / B2B
+  'start free', 'get demo', 'book demo', 'talk sales', 'view demo', 'view case',
+  'get started free', 'start free trial', 'try free',
+
+  // Lead Gen / Content
+  'download now', 'get ebook', 'free download', 'read more', 'view guide',
+  'read guide', 'get checklist', 'get template', 'get report',
+
+  // Community / Social
+  'follow us', 'join us', 'join now', 'join free', 'become member',
+  'follow along', 'stay updated', 'join community', 'join newsletter',
+  'sign me up'
 ];
 
 export const IMPACT_COLORS = {

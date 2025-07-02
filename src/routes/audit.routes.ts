@@ -7,7 +7,7 @@ const router = Router();
 // Start a new audit
 router.post('/start', async (req: Request, res: Response) => {
   try {
-    const { url, pages, authorUid } = req.body;
+    const { url, pages, authorUid, enableAI } = req.body;
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
@@ -21,7 +21,8 @@ router.post('/start', async (req: Request, res: Response) => {
     const result = await AuditService.startAudit({
       url: normalizedUrl,
       ...(pages ? { pages } : {}),
-      ...(authorUid ? { authorUid } : {})
+      ...(authorUid ? { authorUid } : {}),
+      ...(typeof enableAI === 'boolean' ? { enableAI } : {})
     });
 
     if (result.error) {
@@ -44,7 +45,7 @@ router.post('/start', async (req: Request, res: Response) => {
 // Start a new audit (GET with query params)
 router.get('/start', async (req: Request, res: Response) => {
   try {
-    const { url, pages, authorUid } = req.query;
+    const { url, pages, authorUid, enableAI } = req.query;
 
     if (!url || typeof url !== 'string') {
       return res.status(400).json({ error: 'URL is required' });
@@ -65,6 +66,10 @@ router.get('/start', async (req: Request, res: Response) => {
 
     if (typeof authorUid === 'string') {
       auditRequest.authorUid = authorUid;
+    }
+
+    if (typeof enableAI === 'string') {
+      auditRequest.enableAI = enableAI.toLowerCase() === 'true';
     }
 
     const result = await AuditService.startAudit(auditRequest);

@@ -211,6 +211,19 @@ export class AuditService {
         console.log(`✅ Screenshots added to pageData:`, pageData.screenshots);
       }
 
+      // Run AI analysis on each page at the end
+      console.log(`🤖 Running AI analysis on ${pages.length} pages`);
+      for (const pageData of pages) {
+        try {
+          const aiAnalysis = await (await import('./ai.service.js')).AIService.analyzePage(pageData, request.enableAI ?? true);
+          pageData.ai = aiAnalysis;
+          console.log(`✅ AI analysis completed for ${pageData.url}`);
+        } catch (aiError) {
+          console.error(`⚠️ AI analysis failed for ${pageData.url}:`, aiError);
+          // Continue without AI analysis
+        }
+      }
+
       // Save all pages to Firebase
       console.log(`💾 Saving page data to Firebase`);
       await firebaseService.updateAuditPages(auditId, pages);

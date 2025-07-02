@@ -4,9 +4,6 @@ import { StorageService } from './storage.service.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class ScreenshotService {
-  private static queue: Array<() => Promise<any>> = [];
-  private static isProcessing = false;
-  
   // Screenshot dimensions for different use cases
   static readonly DIMENSIONS = {
     DESKTOP: { width: 1920, height: 1080 },
@@ -101,41 +98,6 @@ export class ScreenshotService {
         await PuppeteerConfig.forceCleanup();
       }
     }
-  }
-
-  private static async processQueue(): Promise<void> {
-    if (this.isProcessing || this.queue.length === 0) {
-      return;
-    }
-
-    this.isProcessing = true;
-    console.log(`📋 Processing screenshot queue (${this.queue.length} items)`);
-    
-    while (this.queue.length > 0) {
-      const task = this.queue.shift();
-      if (task) {
-        try {
-          await task();
-        } catch (error) {
-          console.error('❌ Queue task failed:', error);
-        }
-      }
-    }
-    this.isProcessing = false;
-  }
-
-  private static queueScreenshot<T>(task: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.queue.push(async () => {
-        try {
-          const result = await task();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      this.processQueue();
-    });
   }
 
   static async takeAndUploadScreenshots(
