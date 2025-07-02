@@ -5,6 +5,15 @@ import { PageAccessibilityData } from '../types/index.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class AccessibilityService {
+  // Filter out non-visual violations that can't be annotated
+  private static filterVisualViolations(violations: any[]): any[] {
+    const skipIds = [
+      'document-title', 'html-has-lang', 'meta-viewport', 
+      'landmark-one-main', 'region', 'page-has-heading-one'
+    ];
+    return violations.filter((violation: any) => !skipIds.includes(violation.id));
+  }
+
   // Accessibility screenshot dimensions (exact specs from requirements)
   static readonly DIMENSIONS = {
     DESKTOP: { width: 1046, height: 679 }, // Updated for annotated desktop screenshot
@@ -170,8 +179,11 @@ export class AccessibilityService {
           // Continue without screenshot
         }
 
-        // Format violations for storage
-        const formattedViolations = violations.map((v: any) => ({
+        // Filter out non-visual violations (same as used for annotations)
+        const visualViolations = this.filterVisualViolations(violations);
+
+        // Format violations for storage - only visual violations to match annotations
+        const formattedViolations = visualViolations.map((v: any) => ({
           id: v.id,
           impact: v.impact,
           description: v.description,
@@ -238,13 +250,7 @@ export class AccessibilityService {
     await new Promise(res => setTimeout(res, 500));
     
     // Filter out non-visual violations
-    const visualViolations = violations.filter((violation: any) => {
-      const skipIds = [
-        'document-title', 'html-has-lang', 'meta-viewport', 
-        'landmark-one-main', 'region', 'page-has-heading-one'
-      ];
-      return !skipIds.includes(violation.id);
-    });
+    const visualViolations = this.filterVisualViolations(violations);
     
     console.log('📍 Visual violations to process:', visualViolations.length);
     
@@ -320,44 +326,40 @@ export class AccessibilityService {
         // Add circle with number
         annotations.push(`
           <circle cx="${x}" cy="${y}" r="15" fill="${color}" stroke="white" stroke-width="2" opacity="0.9"/>
-          <text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="12" font-weight="bold" style="font-family: 'Inter', 'Arial', sans-serif;">${index + 1}</text>
+          <text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${index + 1}</text>
         `);
       });
       
-      // Add legend at bottom
+      // Add legend with colors
       const isMobile = width <= 400;
-      const legendHeight = isMobile ? 80 : 100;
+      const legendHeight = isMobile ? 80 : 60;
       const legendY = height - legendHeight - 10;
-      const legendFont = "font-family: 'Inter', 'Arial', sans-serif;";
+      
       if (isMobile) {
-        // Mobile: stack legend items vertically, smaller font, tighter spacing, wrap keys
         annotations.push(`
           <rect x="10" y="${legendY}" width="${width - 20}" height="${legendHeight}" fill="rgba(0,0,0,0.8)" rx="5"/>
-          <text x="20" y="${legendY + 22}" fill="white" font-size="12" font-weight="bold" style="${legendFont}">Accessibility Issues</text>
-          <circle cx="30" cy="${legendY + 40}" r="6" fill="#dc2626"/>
-          <text x="45" y="${legendY + 44}" fill="white" font-size="10" style="${legendFont}">Critical</text>
-          <circle cx="110" cy="${legendY + 40}" r="6" fill="#ea580c"/>
-          <text x="125" y="${legendY + 44}" fill="white" font-size="10" style="${legendFont}">Serious</text>
-          <circle cx="30" cy="${legendY + 60}" r="6" fill="#d97706"/>
-          <text x="45" y="${legendY + 64}" fill="white" font-size="10" style="${legendFont}">Moderate</text>
-          <circle cx="110" cy="${legendY + 60}" r="6" fill="#65a30d"/>
-          <text x="125" y="${legendY + 64}" fill="white" font-size="10" style="${legendFont}">Minor</text>
-          <text x="20" y="${legendY + legendHeight - 10}" fill="white" font-size="9" style="${legendFont}">Numbers indicate issue locations</text>
+          <text x="20" y="${legendY + 18}" fill="white" font-size="12" font-weight="bold">Accessibility Issues</text>
+          <circle cx="25" cy="${legendY + 35}" r="6" fill="#dc2626"/>
+          <text x="38" y="${legendY + 39}" fill="white" font-size="9">Critical</text>
+          <circle cx="90" cy="${legendY + 35}" r="6" fill="#ea580c"/>
+          <text x="103" y="${legendY + 39}" fill="white" font-size="9">Serious</text>
+          <circle cx="25" cy="${legendY + 55}" r="6" fill="#d97706"/>
+          <text x="38" y="${legendY + 59}" fill="white" font-size="9">Moderate</text>
+          <circle cx="90" cy="${legendY + 55}" r="6" fill="#0d9488"/>
+          <text x="103" y="${legendY + 59}" fill="white" font-size="9">Minor</text>
         `);
       } else {
-        // Desktop: original layout, but with font-family
         annotations.push(`
           <rect x="10" y="${legendY}" width="${width - 20}" height="${legendHeight}" fill="rgba(0,0,0,0.8)" rx="5"/>
-          <text x="20" y="${legendY + 25}" fill="white" font-size="14" font-weight="bold" style="${legendFont}">Accessibility Issues</text>
-          <circle cx="30" cy="${legendY + 45}" r="8" fill="#dc2626"/>
-          <text x="50" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Critical</text>
-          <circle cx="120" cy="${legendY + 45}" r="8" fill="#ea580c"/>
-          <text x="140" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Serious</text>
-          <circle cx="210" cy="${legendY + 45}" r="8" fill="#d97706"/>
-          <text x="230" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Moderate</text>
-          <circle cx="300" cy="${legendY + 45}" r="8" fill="#65a30d"/>
-          <text x="320" y="${legendY + 50}" fill="white" font-size="12" style="${legendFont}">Minor</text>
-          <text x="20" y="${legendY + 80}" fill="white" font-size="10" style="${legendFont}">Numbers indicate issue locations</text>
+          <text x="20" y="${legendY + 20}" fill="white" font-size="14" font-weight="bold">Accessibility Issues</text>
+          <circle cx="30" cy="${legendY + 40}" r="8" fill="#dc2626"/>
+          <text x="50" y="${legendY + 45}" fill="white" font-size="12">Critical</text>
+          <circle cx="120" cy="${legendY + 40}" r="8" fill="#ea580c"/>
+          <text x="140" y="${legendY + 45}" fill="white" font-size="12">Serious</text>
+          <circle cx="210" cy="${legendY + 40}" r="8" fill="#d97706"/>
+          <text x="230" y="${legendY + 45}" fill="white" font-size="12">Moderate</text>
+          <circle cx="300" cy="${legendY + 40}" r="8" fill="#0d9488"/>
+          <text x="320" y="${legendY + 45}" fill="white" font-size="12">Minor</text>
         `);
       }
       
@@ -388,11 +390,11 @@ export class AccessibilityService {
 
   private static getImpactColor(impact: string): string {
     switch (impact) {
-      case 'critical': return '#dc2626'; // red-600
-      case 'serious': return '#ea580c';  // orange-600
-      case 'moderate': return '#d97706'; // amber-600
-      case 'minor': return '#65a30d';    // lime-600
-      default: return '#6b7280';         // gray-500
+      case 'critical': return '#dc2626';    // red
+      case 'serious': return '#ea580c';     // orange
+      case 'moderate': return '#d97706';    // yellow/amber
+      case 'minor': return '#0d9488';       // teal
+      default: return '#6b7280';            // gray
     }
   }
 }

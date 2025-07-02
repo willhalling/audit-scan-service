@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { generateHeaders } from '../utils/helpers.js';
-import { PageData, PageMeta, PageHeaders } from '../types/index.js';
+import { PageData, PageMeta, PageHeaders, WordCloudData } from '../types/index.js';
 
 export class ScrapeService {
   
@@ -37,7 +37,28 @@ export class ScrapeService {
 
   static extractBodyText($: cheerio.CheerioAPI): string {
     $('script, style, nav, footer, header').remove();
-    return $('body').text().replace(/\s+/g, ' ').trim().substring(0, 1000);
+    return $('body').text().replace(/\s+/g, ' ').trim();
+  }
+
+  static getWordCount(text: string): number {
+    return text.split(/\s+/).filter(word => word.length > 0).length;
+  }
+
+  static generateWordCloud(text: string): WordCloudData[] {
+    const words = text.toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .split(/\s+/)
+      .filter(word => word.length > 3);
+    
+    const wordCount: { [key: string]: number } = {};
+    words.forEach(word => {
+      wordCount[word] = (wordCount[word] || 0) + 1;
+    });
+
+    return Object.entries(wordCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 50)
+      .map(([text, count]) => ({ text, size: count }));
   }
 
   static getTextToHtmlRatio(html: string): number {
@@ -61,6 +82,8 @@ export class ScrapeService {
     const headers = this.extractHeaders($);
     const ctas = this.extractCTAs($);
     const bodyText = this.extractBodyText($);
+    const wordCount = this.getWordCount(bodyText);
+    const wordCloudData = this.generateWordCloud(bodyText);
     const textToHtmlRatio = this.getTextToHtmlRatio(html);
 
     const robotsMeta = $('meta[name="robots"]').attr('content') || '';
@@ -76,7 +99,9 @@ export class ScrapeService {
       hasViewportMetaTag,
       canonical: meta.canonical || url,
       ctas,
-      bodyText,
+      bodyText: bodyText.substring(0, 1000), // Keep first 1000 chars for storage
+      wordCount,
+      wordCloudData,
       textToHtmlRatio,
       headers,
       hasSingleH1,

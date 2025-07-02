@@ -1,6 +1,6 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
-import { LighthouseConfig, LighthouseResult } from '../types/index.js';
+import { LighthouseResult, LighthouseOptions } from '../types/index.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class LighthouseService {
@@ -71,7 +71,37 @@ export class LighthouseService {
     });
   }
 
-  static async runLighthouse(config: LighthouseConfig): Promise<LighthouseResult> {
+  // Extract violations from Lighthouse audits in the same format as accessibility
+  private static extractLighthouseViolations(lhr: any): Array<{ issue: string; suggestion: string; severity: 'critical' | 'serious' | 'moderate' | 'minor' }> {
+    const violations: Array<{ issue: string; suggestion: string; severity: 'critical' | 'serious' | 'moderate' | 'minor' }> = [];
+    
+    if (!lhr.audits) return violations;
+    
+    // Check failed audits that indicate violations
+    for (const [auditId, auditData] of Object.entries(lhr.audits as any)) {
+      const audit = auditData as any;
+      if (audit.score !== null && audit.score < 1) {
+        const severity = this.mapScoreToSeverity(audit.score);
+        violations.push({
+          issue: audit.title || auditId,
+          suggestion: audit.description || 'See Lighthouse documentation for details',
+          severity
+        });
+      }
+    }
+    
+    return violations;
+  }
+  
+  // Map Lighthouse scores to severity levels
+  private static mapScoreToSeverity(score: number): 'critical' | 'serious' | 'moderate' | 'minor' {
+    if (score === 0) return 'critical';
+    if (score < 0.5) return 'serious';
+    if (score < 0.9) return 'moderate';
+    return 'minor';
+  }
+
+  static async runLighthouse(config: LighthouseOptions): Promise<LighthouseResult> {
     return this.queueLighthouse(async () => {
       // Check if there's already a Chrome instance running
       if (this.activeChrome) {
@@ -178,13 +208,15 @@ export class LighthouseService {
           }
         }
 
+        // Extract violations from failed audits
+        const violations = this.extractLighthouseViolations(runnerResult.lhr);
+
         return {
           url: config.url,
           timestamp: new Date().toISOString(),
           categories: runnerResult.lhr.categories,
           audits: essentialAudits, // Only essential audit data
-          lighthouseVersion: runnerResult.lhr.lighthouseVersion,
-          userAgent: runnerResult.lhr.userAgent
+          violations // Add violations in same format as accessibility
         };
       } catch (lighthouseError) {
         console.error('❌ Lighthouse execution failed:', lighthouseError);
@@ -210,7 +242,7 @@ export class LighthouseService {
     });
   }
 
-  static async getLighthouseSummary(config: LighthouseConfig) {
+  static async getLighthouseSummary(config: LighthouseOptions) {
     const result = await this.runLighthouse(config);
     
     return {

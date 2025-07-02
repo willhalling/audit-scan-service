@@ -132,17 +132,24 @@ export class AuditService {
           } else {
             console.log('⚠️ No annotated mobile screenshot URL returned.');
           }
-          // Save only description and help for violations
+          // Save only description, help, severity, and metadata for violations
+          const nonVisualIds = ['document-title', 'html-has-lang', 'meta-viewport', 'landmark-one-main', 'region', 'page-has-heading-one'];
           pageData.accessibilityDesktop = {
             violations: desktopResult.violations.map(v => ({
+              id: v.id,
               issue: v.description,
-              suggestion: v.help
+              suggestion: v.help,
+              severity: v.impact,
+              isVisual: !nonVisualIds.includes(v.id)
             }))
           };
           pageData.accessibilityMobile = {
             violations: mobileResult.violations.map(v => ({
+              id: v.id,
               issue: v.description,
-              suggestion: v.help
+              suggestion: v.help,
+              severity: v.impact,
+              isVisual: !nonVisualIds.includes(v.id)
             }))
           };
           // To revert to saving all data, just use: violations: desktopResult.violations
@@ -157,7 +164,7 @@ export class AuditService {
             url: pageData.url,
             useDesktop: true
           });
-          // Save only scores and core vitals
+          // Save scores and core vitals
           pageData.lighthouseDesktop = {
             performance: Math.round((lighthouseDesktop.categories.performance?.score || 0) * 100),
             accessibility: Math.round((lighthouseDesktop.categories.accessibility?.score || 0) * 100),
@@ -168,7 +175,8 @@ export class AuditService {
             cumulativeLayoutShift: lighthouseDesktop.audits['cumulative-layout-shift']?.numericValue || 0,
             totalBlockingTime: Math.round(lighthouseDesktop.audits['total-blocking-time']?.numericValue || 0),
             speedIndex: Math.round(lighthouseDesktop.audits['speed-index']?.numericValue || 0),
-            interactionToNextPaint: Math.round(lighthouseDesktop.audits['interactive']?.numericValue || 0)
+            interactionToNextPaint: Math.round(lighthouseDesktop.audits['interactive']?.numericValue || 0),
+            violations: lighthouseDesktop.violations || []
           };
           console.log('✅ Lighthouse desktop audit complete');
 
@@ -187,7 +195,8 @@ export class AuditService {
             cumulativeLayoutShift: lighthouseMobile.audits['cumulative-layout-shift']?.numericValue || 0,
             totalBlockingTime: Math.round(lighthouseMobile.audits['total-blocking-time']?.numericValue || 0),
             speedIndex: Math.round(lighthouseMobile.audits['speed-index']?.numericValue || 0),
-            interactionToNextPaint: Math.round(lighthouseMobile.audits['interactive']?.numericValue || 0)
+            interactionToNextPaint: Math.round(lighthouseMobile.audits['interactive']?.numericValue || 0),
+            violations: lighthouseMobile.violations || []
           };
           console.log('✅ Lighthouse mobile audit complete');
           // To revert to saving all data, just use: pageData.lighthouseDesktop = lighthouseDesktop

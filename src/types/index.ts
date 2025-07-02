@@ -1,4 +1,4 @@
-export interface LighthouseConfig {
+export interface LighthouseOptions {
   url: string;
   useDesktop?: boolean;
   categories?: string[];
@@ -9,6 +9,11 @@ export interface LighthouseResult {
   timestamp: string;
   categories: any;
   audits: any;
+  violations?: Array<{
+    issue: string;
+    suggestion: string;
+    severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  }>;
 }
 
 export interface ScrapeResult {
@@ -23,6 +28,7 @@ export interface ScrapeResult {
   links: string[];
   images: string[];
   ctas: string[];
+  wordCount: number;
   forms: FormInfo[];
   socialLinks: SocialPlatforms;
   brokenLinks: {
@@ -32,6 +38,12 @@ export interface ScrapeResult {
   };
   pageCount: number;
   contentAnalysis: ContentAnalysis;
+  wordCloudData: WordCloudData[];
+}
+
+export interface WordCloudData {
+  text: string;
+  size: number;
 }
 
 export interface FormInfo {
@@ -177,11 +189,6 @@ export interface PageAccessibilityData {
   }>;
 }
 
-export interface WordCloudItem {
-  text: string;
-  size: number;
-}
-
 export interface PageData {
   url: string;
   pagePath: string;
@@ -212,17 +219,21 @@ export interface PageData {
     requiredFields: number;
     buttons: number;
   }>;
-  issues?: {
-    high: string[];
-    medium: string[];
-    low: string[];
-  };
-  suggestions?: string[];
+  issues?: Array<{
+    issue: string;
+    suggestion: string;
+    severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  }>;
+  suggestions?: Array<{
+    issue: string;
+    suggestion: string;
+    severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  }>;
   lighthouseDesktop?: ReducedLighthouseData;
   lighthouseMobile?: ReducedLighthouseData;
   accessibilityDesktop?: { violations: ReducedAccessibilityViolation[] };
   accessibilityMobile?: { violations: ReducedAccessibilityViolation[] };
-  wordCloudData?: WordCloudItem[];
+  wordCloudData?: WordCloudData[];
 }
 
 export interface AuditResult {
@@ -239,8 +250,11 @@ export interface AuditResult {
 
 // Only the fields to save for each violation
 export interface ReducedAccessibilityViolation {
+  id: string;
   issue: string;
   suggestion: string;
+  severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  isVisual: boolean; // Whether this violation appears in annotations
 }
 
 // Only the fields to save for Lighthouse
@@ -255,4 +269,9 @@ export interface ReducedLighthouseData {
   totalBlockingTime: number;
   speedIndex: number;
   interactionToNextPaint?: number;
+  violations?: Array<{
+    issue: string;
+    suggestion: string;
+    severity: 'critical' | 'serious' | 'moderate' | 'minor';
+  }>;
 }
