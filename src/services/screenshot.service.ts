@@ -16,7 +16,7 @@ export class ScreenshotService {
   static async takeScreenshot(options: ScreenshotOptions): Promise<Buffer> {
     // Add a hard timeout to prevent indefinite hanging
     const timeoutPromise = new Promise<Buffer>((_, reject) => {
-      setTimeout(() => reject(new Error('Screenshot timeout after 45 seconds')), 45000);
+      setTimeout(() => reject(new Error('Screenshot timeout after 90 seconds')), 90000);
     });
 
     const screenshotPromise = this.attemptScreenshot(options);
