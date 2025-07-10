@@ -69,7 +69,7 @@ export class AuditService {
     await firebaseService.createAudit(auditId, request.url, request.authorUid);
     
     // Start the audit process in the background
-    this.runAudit(auditId, request).catch(async (error) => {
+    await this.runAudit(auditId, request).catch(async (error) => {
       console.error(`❌ Audit ${auditId} failed:`, error);
       await firebaseService.updateAuditError(auditId, error.message);
     });
