@@ -7,10 +7,14 @@ const router = Router();
 // Start a new audit
 router.post('/start', async (req: Request, res: Response) => {
   try {
-    const { url, pages, authorUid, enableAI } = req.body;
+    const { url, pages, authorUid, enableAI, auditId } = req.body;
 
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
+    }
+
+    if (!auditId) {
+      return res.status(400).json({ error: 'auditId is required' });
     }
 
     const normalizedUrl = normalizeUrl(url);
@@ -18,12 +22,24 @@ router.post('/start', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid URL format' });
     }
 
-    const result = await AuditService.startAudit({
+    const auditRequest: any = {
       url: normalizedUrl,
-      ...(pages ? { pages } : {}),
-      ...(authorUid ? { authorUid } : {}),
-      ...(typeof enableAI === 'boolean' ? { enableAI } : {})
-    });
+      auditId: auditId
+    };
+
+    if (pages) {
+      auditRequest.pages = pages;
+    }
+
+    if (authorUid) {
+      auditRequest.authorUid = authorUid;
+    }
+
+    if (typeof enableAI === 'boolean') {
+      auditRequest.enableAI = enableAI;
+    }
+
+    const result = await AuditService.startAudit(auditRequest);
 
     if (result.error) {
       return res.status(400).json({ 

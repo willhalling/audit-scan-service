@@ -1,4 +1,5 @@
 import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { ScreenshotOptions, PageScreenshots } from '../types/index.js';
 import { StorageService } from './storage.service.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
@@ -67,8 +68,8 @@ export class ScreenshotService {
 
       // Hide elements before screenshot if specified
       if (options.hideSelectors && options.hideSelectors.length > 0) {
-        await page.evaluate((selectors) => {
-          selectors.forEach((selector) => {
+        await page.evaluate((selectors: string[]) => {
+          selectors.forEach((selector: string) => {
             const el = document.querySelector(selector);
             if (el) {
               (el as HTMLElement).style.display = 'none';

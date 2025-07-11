@@ -1,70 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
-import { AuditRequest, PageScreenshots } from '../types/index.js';
+import type { AuditRequest, PageScreenshots } from '../types/index.js';
 import { firebaseService } from './firebase.service.js';
 import { ScrapeService } from './scrape.service.js';
 import { ScreenshotService } from './screenshot.service.js';
 import { AccessibilityService } from './accessibility-new.service.js';
 
 export class AuditService {
-  static generateAuditId(url: string): string {
-    const domain = new URL(url).hostname.replace(/^www\./, '');
-    const randomId = uuidv4().split('-')[0];
-    return `${domain}-${randomId}`;
-  }
 
-  static async validateUrl(url: string): Promise<{ valid: boolean; error?: string }> {
-    try {
-      console.log(`🔍 Validating URL: ${url}`);
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      
-      const response = await fetch(url, {
-        method: 'HEAD',
-        signal: controller.signal,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-      });
+  static async startAudit(request: AuditRequest & { auditId: string }): Promise<{ auditId: string; error?: string }> {
 
-      clearTimeout(timeoutId);
+    const auditId = request.auditId;
 
-      if (!response.ok) {
-        return {
-          valid: false,
-          error: `URL returned ${response.status} ${response.statusText}`
-        };
-      }
-
-      console.log(`✅ URL is valid: ${url}`);
-      return { valid: true };
-
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.log(`❌ URL validation failed: ${errorMessage}`);
-      
-      return {
-        valid: false,
-        error: `URL cannot be reached: ${errorMessage}`
-      };
-    }
-  }
-
-  static async startAudit(request: AuditRequest): Promise<{ auditId: string; error?: string }> {
-    // Validate URL first
-    const validation = await this.validateUrl(request.url);
-    if (!validation.valid) {
-      const result: { auditId: string; error?: string } = {
-        auditId: ''
-      };
-      if (validation.error) {
-        result.error = validation.error;
-      }
-      return result;
-    }
-
-    const auditId = this.generateAuditId(request.url);
-    
     // Create audit record in Firebase with authorUid if provided
     await firebaseService.createAudit(auditId, request.url, request.authorUid);
     
