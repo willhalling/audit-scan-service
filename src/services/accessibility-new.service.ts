@@ -38,7 +38,7 @@ export class AccessibilityService {
     console.log(`♿ Running mobile accessibility audit...`);
     const mobileResult = await this.runSingleAccessibilityAudit(url, auditId, host, 'mobile');
 
-    // Combine results - take the worst case for violations
+    // Combine results - take violations from both desktop and mobile (max 5 each = 10 total)
     const allViolations = [...desktopResult.violations, ...mobileResult.violations];
     
     // Remove duplicates based on violation ID
@@ -194,6 +194,9 @@ export class AccessibilityService {
         const violations = (axeResults as any).violations || [];
         console.log(`♿ Found ${violations.length} ${viewport} violations`);
         
+        // Get element coordinates and violation indexes for annotations
+        const { elementCoordinates, violationIndexes } = await this.getElementCoordinates(page, violations);
+        
         let annotatedScreenshotUrl: string | undefined;
 
         // Take screenshot with error handling
@@ -220,8 +223,6 @@ export class AccessibilityService {
             };
           });
           console.log(`📏 ${viewport} viewport info:`, JSON.stringify(viewportInfo, null, 2));
-          
-          const elementCoordinates = await this.getElementCoordinates(page, violations);
           
           // Get actual viewport dimensions to ensure screenshot matches exactly
           const actualViewport = await page.evaluate(() => ({
@@ -266,19 +267,24 @@ export class AccessibilityService {
         // Filter out non-visual violations (same as used for annotations)
         const visualViolations = this.filterVisualViolations(violations);
 
-        // Format violations for storage - only visual violations to match annotations
-        const formattedViolations = visualViolations.map((v: any) => ({
-          id: v.id,
-          impact: v.impact,
-          description: v.description,
-          help: v.help,
-          helpUrl: v.helpUrl,
-          nodes: v.nodes?.slice(0, 3).map((node: any) => ({
-            html: node.html?.substring(0, 200),
-            target: node.target,
-            failureSummary: node.failureSummary
-          })) || []
-        }));
+        // Format violations for storage - only the violations that were actually annotated (numbered 1-5)
+        // Use violationIndexes to get the exact violations that correspond to the annotations
+        const annotatedViolationIndexes = violationIndexes.slice(0, 5); // Only first 5 that were annotated
+        const formattedViolations = annotatedViolationIndexes.map((violationIndex: number) => {
+          const v = visualViolations[violationIndex];
+          return {
+            id: v.id,
+            impact: v.impact,
+            description: v.description,
+            help: v.help,
+            helpUrl: v.helpUrl,
+            nodes: v.nodes?.slice(0, 3).map((node: any) => ({
+              html: node.html?.substring(0, 200),
+              target: node.target,
+              failureSummary: node.failureSummary
+            })) || []
+          };
+        });
 
         await browser.close();
         
@@ -322,7 +328,10 @@ export class AccessibilityService {
   private static async getElementCoordinates(
     page: any,
     violations: any[]
-  ): Promise<Array<{x: number, y: number, width: number, height: number, impact: string}>> {
+  ): Promise<{
+    elementCoordinates: Array<{x: number, y: number, width: number, height: number, impact: string}>;
+    violationIndexes: number[];
+  }> {
     console.log('📍 Getting element coordinates for', violations.length, 'violations');
     
     // Scroll to top to ensure consistent coordinate system
@@ -338,13 +347,14 @@ export class AccessibilityService {
     
     console.log('📍 Visual violations to process:', visualViolations.length);
     
-    const elementCoordinates = await page.evaluate((violations: any[]) => {
+    const result = await page.evaluate((violations: any[]) => {
       const coords: Array<{x: number, y: number, width: number, height: number, impact: string}> = [];
+      const violationIndexes: number[] = [];
       const viewportWidth = window.innerWidth;
       const viewportHeight = window.innerHeight;
       let elementsOutsideViewport = 0;
       
-      violations.forEach((violation: any) => {
+      violations.forEach((violation: any, violationIndex: number) => {
         violation.nodes.forEach((node: any) => {
           try {
             const selectors = Array.isArray(node.target) ? node.target : [node.target];
@@ -370,6 +380,7 @@ export class AccessibilityService {
                         height: rect.height,
                         impact: violation.impact
                       });
+                      violationIndexes.push(violationIndex);
                     }
                   });
                 } catch (selectorError) {
@@ -384,11 +395,11 @@ export class AccessibilityService {
       });
       
       console.log(`📍 Viewport: ${viewportWidth}x${viewportHeight}, Elements outside viewport: ${elementsOutsideViewport}/${coords.length}`);
-      return coords;
+      return { elementCoordinates: coords, violationIndexes };
     }, visualViolations);
     
-    console.log('📍 Got coordinates for', elementCoordinates.length, 'elements');
-    return elementCoordinates;
+    console.log('📍 Got coordinates for', result.elementCoordinates.length, 'elements');
+    return result;
   }
 
   private static async annotateScreenshot(
@@ -415,49 +426,21 @@ export class AccessibilityService {
       const annotations: string[] = [];
       
       elementCoordinates.forEach((coord, index) => {
-        const x = Math.max(25, Math.min(width - 25, coord.x));
-        const y = Math.max(25, Math.min(height - 25, coord.y));
+        // Only annotate the first 5 violations
+        if (index >= 5) return;
+        
+        const x = Math.max(30, Math.min(width - 30, coord.x)); // Adjusted margins for larger circles
+        const y = Math.max(30, Math.min(height - 30, coord.y));
         const color = this.getImpactColor(coord.impact);
         
-        // Add circle with number
+        // Add circle with number (100% larger size, 75% background transparency)
         annotations.push(`
-          <circle cx="${x}" cy="${y}" r="15" fill="${color}" stroke="white" stroke-width="2" opacity="0.9"/>
-          <text x="${x}" y="${y + 4}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${index + 1}</text>
+          <circle cx="${x}" cy="${y}" r="30" fill="${color}" stroke="white" stroke-width="4" opacity="0.75"/>
+          <text x="${x}" y="${y + 8}" text-anchor="middle" fill="white" font-size="24" font-weight="bold">${index + 1}</text>
         `);
       });
       
-      // Add legend with colors
-      const isMobile = width <= 400;
-      const legendHeight = isMobile ? 80 : 60;
-      const legendY = height - legendHeight - 10;
-      
-      if (isMobile) {
-        annotations.push(`
-          <rect x="10" y="${legendY}" width="${width - 20}" height="${legendHeight}" fill="rgba(0,0,0,0.8)" rx="5"/>
-          <text x="20" y="${legendY + 18}" fill="white" font-size="12" font-weight="bold">Accessibility Issues</text>
-          <circle cx="25" cy="${legendY + 35}" r="6" fill="#dc2626"/>
-          <text x="38" y="${legendY + 39}" fill="white" font-size="9">Critical</text>
-          <circle cx="90" cy="${legendY + 35}" r="6" fill="#ea580c"/>
-          <text x="103" y="${legendY + 39}" fill="white" font-size="9">Serious</text>
-          <circle cx="25" cy="${legendY + 55}" r="6" fill="#d97706"/>
-          <text x="38" y="${legendY + 59}" fill="white" font-size="9">Moderate</text>
-          <circle cx="90" cy="${legendY + 55}" r="6" fill="#0d9488"/>
-          <text x="103" y="${legendY + 59}" fill="white" font-size="9">Minor</text>
-        `);
-      } else {
-        annotations.push(`
-          <rect x="10" y="${legendY}" width="${width - 20}" height="${legendHeight}" fill="rgba(0,0,0,0.8)" rx="5"/>
-          <text x="20" y="${legendY + 20}" fill="white" font-size="14" font-weight="bold">Accessibility Issues</text>
-          <circle cx="30" cy="${legendY + 40}" r="8" fill="#dc2626"/>
-          <text x="50" y="${legendY + 45}" fill="white" font-size="12">Critical</text>
-          <circle cx="120" cy="${legendY + 40}" r="8" fill="#ea580c"/>
-          <text x="140" y="${legendY + 45}" fill="white" font-size="12">Serious</text>
-          <circle cx="210" cy="${legendY + 40}" r="8" fill="#d97706"/>
-          <text x="230" y="${legendY + 45}" fill="white" font-size="12">Moderate</text>
-          <circle cx="300" cy="${legendY + 40}" r="8" fill="#0d9488"/>
-          <text x="320" y="${legendY + 45}" fill="white" font-size="12">Minor</text>
-        `);
-      }
+      // Remove legend - no longer needed
       
       const svgOverlay = `
         <svg width="${width}" height="${height}">
