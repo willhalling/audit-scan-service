@@ -436,7 +436,7 @@ export class AccessibilityService {
         // Add circle with number (100% larger size, 75% background transparency)
         annotations.push(`
           <circle cx="${x}" cy="${y}" r="30" fill="${color}" stroke="white" stroke-width="4" opacity="0.75"/>
-          <text x="${x}" y="${y + 8}" text-anchor="middle" fill="white" font-size="24" font-weight="bold">${index + 1}</text>
+          <text x="${x}" y="${y + 8}" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="24" font-weight="bold">${index + 1}</text>
         `);
       });
       
