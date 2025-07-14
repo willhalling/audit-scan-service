@@ -61,7 +61,7 @@ export class ScreenshotService {
       console.log(`🌐 Navigating to: ${options.url}`);
       const navStartTime = Date.now();
       await page.goto(options.url, { 
-        waitUntil: 'domcontentloaded', 
+        waitUntil: 'networkidle2', 
         timeout: 60000 // Increased to match browser launch timeout
       });
       console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
