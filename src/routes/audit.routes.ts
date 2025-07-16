@@ -9,6 +9,10 @@ router.post('/start', async (req: Request, res: Response) => {
   try {
     const { url, pages, authorUid, enableAI, auditId } = req.body;
 
+    // Debug logs for enableAI
+    console.log('🔍 POST enableAI value:', enableAI);
+    console.log('🔍 POST enableAI type:', typeof enableAI);
+
     if (!url) {
       return res.status(400).json({ error: 'URL is required' });
     }

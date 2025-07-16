@@ -18,7 +18,12 @@ export class AIService {
   }
 
   static async analyzePage(pageData: PageData, enableAI: boolean = true): Promise<AIAnalysis> {
+    // Debug logs for enableAI
+    console.log('🔍 AI Service enableAI value:', enableAI);
+    console.log('🔍 AI Service enableAI type:', typeof enableAI);
+    
     if (!enableAI) {
+      console.log('🚫 AI disabled - returning dummy analysis');
       return this.getDummyAnalysis();
     }
 
