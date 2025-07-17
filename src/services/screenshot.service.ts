@@ -3,6 +3,7 @@ import chromium from '@sparticuz/chromium';
 import { ScreenshotOptions, PageScreenshots } from '../types/index.js';
 import { StorageService } from './storage.service.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
+import { hideElementsForScreenshot, waitForPageReady } from '../utils/screenshot-helpers.js';
 
 export class ScreenshotService {
   // Screenshot dimensions for different use cases
@@ -66,17 +67,11 @@ export class ScreenshotService {
       });
       console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
 
-      // Hide elements before screenshot if specified
-      if (options.hideSelectors && options.hideSelectors.length > 0) {
-        await page.evaluate((selectors: string[]) => {
-          selectors.forEach((selector: string) => {
-            const el = document.querySelector(selector);
-            if (el) {
-              (el as HTMLElement).style.display = 'none';
-            }
-          });
-        }, options.hideSelectors);
-      }
+      // Hide elements before screenshot using shared utility
+      await hideElementsForScreenshot(page, options.hideSelectors);
+
+      // Wait for page to be ready for screenshot
+      await waitForPageReady(page);
 
       console.log(`📸 Taking screenshot...`);
       const screenshotStartTime = Date.now();

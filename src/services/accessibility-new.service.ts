@@ -1,8 +1,11 @@
 import puppeteer from 'puppeteer-core';
 import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
 import { StorageService } from './storage.service.js';
 import { PageAccessibilityData } from '../types/index.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
+import { hideElementsForScreenshot, waitForPageReady } from '../utils/screenshot-helpers.js';
 
 export class AccessibilityService {
   // Filter out non-visual violations that can't be annotated
@@ -153,24 +156,64 @@ export class AccessibilityService {
           timeout: 60000 // Increased timeout for production
         });
 
-        // Hide elements before screenshot
-        await page.evaluate(() => {
-          const el = document.querySelector('#CybotCookiebotDialog');
-          if (el) {
-            (el as HTMLElement).style.display = 'none';
-          }
-        });
+        // Hide elements before screenshot using shared utility
+        await hideElementsForScreenshot(page);
 
-        // Inject axe-core with error handling
+        // Inject axe-core from local package to bypass CSP restrictions
         try {
-          await page.addScriptTag({
-            url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
-          });
+          // First try to load locally bundled axe-core
+          const axeCoreDir = path.resolve(process.cwd(), 'node_modules', 'axe-core');
+          let axeCoreScript: string;
+          
+          try {
+            // Try to load from the main dist file
+            const axeCoreMainPath = path.join(axeCoreDir, 'axe.min.js');
+            if (fs.existsSync(axeCoreMainPath)) {
+              axeCoreScript = fs.readFileSync(axeCoreMainPath, 'utf8');
+            } else {
+              // Fallback to alternative path
+              const axeCoreAltPath = path.join(axeCoreDir, 'dist', 'axe.min.js');
+              axeCoreScript = fs.readFileSync(axeCoreAltPath, 'utf8');
+            }
+            
+            // Inject the script content directly
+            await page.addScriptTag({ content: axeCoreScript });
+            console.log('✅ Axe-core injected from local package');
+            
+          } catch (localError) {
+            console.warn('Failed to load axe-core from local package, trying CDN fallback...', localError);
+            
+            // First CDN fallback
+            try {
+              await page.addScriptTag({
+                url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
+              });
+              console.log('✅ Axe-core loaded from primary CDN');
+            } catch (primaryCdnError) {
+              console.warn('Primary CDN failed, trying secondary CDN...', primaryCdnError);
+              
+              // Second CDN fallback
+              try {
+                await page.addScriptTag({
+                  url: 'https://unpkg.com/axe-core@4.8.2/axe.min.js'
+                });
+                console.log('✅ Axe-core loaded from secondary CDN');
+              } catch (secondaryCdnError) {
+                console.warn('Secondary CDN failed, trying CSP bypass...', secondaryCdnError);
+                
+                // Try to temporarily disable CSP and retry
+                await page.setBypassCSP(true);
+                await page.addScriptTag({
+                  url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
+                });
+                console.log('✅ Axe-core loaded with CSP bypass');
+              }
+            }
+          }
         } catch (scriptError) {
-          console.warn('Failed to load axe-core from CDN, trying fallback...');
-          await page.addScriptTag({
-            url: 'https://unpkg.com/axe-core@4.8.2/axe.min.js'
-          });
+          console.error('❌ All axe-core loading methods failed:', scriptError);
+          const errorMessage = scriptError instanceof Error ? scriptError.message : 'Unknown error loading axe-core';
+          throw new Error(`Could not load axe-core script: ${errorMessage}`);
         }
 
         // Run axe-core accessibility audit with timeout
@@ -339,8 +382,8 @@ export class AccessibilityService {
       window.scrollTo(0, 0);
     });
     
-    // Wait for 500ms to ensure page is stable
-    await new Promise(res => setTimeout(res, 500));
+    // Wait for page to be stable using shared utility
+    await waitForPageReady(page, 500);
     
     // Filter out non-visual violations
     const visualViolations = this.filterVisualViolations(violations);

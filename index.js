@@ -612,10 +612,50 @@ app.get('/accessibility', async (req, res) => {
 
     console.log('🚀 Step 4: Injecting axe-core...');
     try {
-      await page.addScriptTag({
-        url: 'https://unpkg.com/axe-core@4.7.0/axe.min.js'
-      });
-      console.log('✅ Step 4 Complete: Axe-core injected');
+      // First try to load locally bundled axe-core to bypass CSP
+      const fs = require('fs');
+      const path = require('path');
+      
+      try {
+        const axeCoreDir = path.resolve(process.cwd(), 'node_modules', 'axe-core');
+        let axeCoreScript;
+        
+        try {
+          // Try to load from the main dist file
+          const axeCoreMainPath = path.join(axeCoreDir, 'axe.min.js');
+          if (fs.existsSync(axeCoreMainPath)) {
+            axeCoreScript = fs.readFileSync(axeCoreMainPath, 'utf8');
+          } else {
+            // Fallback to alternative path
+            const axeCoreAltPath = path.join(axeCoreDir, 'dist', 'axe.min.js');
+            axeCoreScript = fs.readFileSync(axeCoreAltPath, 'utf8');
+          }
+          
+          await page.addScriptTag({ content: axeCoreScript });
+          console.log('✅ Step 4 Complete: Axe-core injected from local package');
+          
+        } catch (localError) {
+          console.warn('Failed to load axe-core from local package, trying CDN fallback...');
+          
+          try {
+            await page.addScriptTag({
+              url: 'https://unpkg.com/axe-core@4.7.0/axe.min.js'
+            });
+            console.log('✅ Step 4 Complete: Axe-core injected from CDN');
+          } catch (cdnError) {
+            console.warn('CDN failed, trying CSP bypass...');
+            
+            // Try to temporarily disable CSP and retry
+            await page.setBypassCSP(true);
+            await page.addScriptTag({
+              url: 'https://unpkg.com/axe-core@4.7.0/axe.min.js'
+            });
+            console.log('✅ Step 4 Complete: Axe-core injected with CSP bypass');
+          }
+        }
+      } catch (allMethodsError) {
+        throw allMethodsError;
+      }
     } catch (error) {
       console.error('❌ Step 4 Failed: Axe-core injection error:', error);
       throw new Error(`Axe-core injection failed: ${error.message}`);
