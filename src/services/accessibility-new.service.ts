@@ -153,11 +153,17 @@ export class AccessibilityService {
         // Navigate with longer timeout and better error handling
         await page.goto(url, { 
           waitUntil: 'networkidle2', 
-          timeout: 60000 // Increased timeout for production
+          timeout: 60000 // Keep original timeout
         });
 
         // Hide elements before screenshot using shared utility
         await hideElementsForScreenshot(page);
+
+        // Wait for page to be ready for screenshot (same as cover screenshot)
+        await waitForPageReady(page);
+        
+        // Wait additional 3 seconds for page to fully load
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
         // Inject axe-core from local package to bypass CSP restrictions
         try {
@@ -217,22 +223,39 @@ export class AccessibilityService {
         }
 
         // Run axe-core accessibility audit with timeout
-        const axeResults = await Promise.race([
-          page.evaluate(() => {
-            return new Promise((resolve) => {
-              (window as any).axe.run((err: any, results: any) => {
-                if (err) {
-                  resolve({ violations: [], passes: [] });
-                } else {
-                  resolve(results);
+        let axeResults;
+        try {
+          axeResults = await Promise.race([
+            page.evaluate(() => {
+              return new Promise((resolve) => {
+                // Add safety check for axe
+                if (typeof (window as any).axe === 'undefined') {
+                  resolve({ violations: [] });
+                  return;
                 }
+                
+                // Run axe with reasonable timeout and standard config - only get violations
+                (window as any).axe.run({
+                  resultTypes: ['violations'] // Only get violations, skip passes to reduce processing
+                }, (err: any, results: any) => {
+                  if (err) {
+                    console.warn('Axe evaluation error:', err);
+                    resolve({ violations: [] });
+                  } else {
+                    resolve(results);
+                  }
+                });
               });
-            });
-          }),
-          new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Axe evaluation timeout')), 30000)
-          )
-        ]);
+            }),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Axe evaluation timeout')), 20000) // 20 second timeout
+            )
+          ]);
+        } catch (axeError) {
+          console.warn(`⚠️ Axe evaluation failed for ${viewport}:`, axeError);
+          // If axe fails, continue without violations but still take screenshot
+          axeResults = { violations: [] };
+        }
 
         const violations = (axeResults as any).violations || [];
         console.log(`♿ Found ${violations.length} ${viewport} violations`);
@@ -244,36 +267,15 @@ export class AccessibilityService {
 
         // Take screenshot with error handling
         try {
-          // Debug viewport and content dimensions
-          const viewportInfo = await page.evaluate(() => {
-            return {
-              viewport: {
-                width: window.innerWidth,
-                height: window.innerHeight
-              },
-              document: {
-                scrollWidth: document.documentElement.scrollWidth,
-                scrollHeight: document.documentElement.scrollHeight,
-                clientWidth: document.documentElement.clientWidth,
-                clientHeight: document.documentElement.clientHeight
-              },
-              body: {
-                scrollWidth: document.body.scrollWidth,
-                scrollHeight: document.body.scrollHeight,
-                clientWidth: document.body.clientWidth,
-                clientHeight: document.body.clientHeight
-              }
-            };
-          });
-          console.log(`📏 ${viewport} viewport info:`, JSON.stringify(viewportInfo, null, 2));
+          // Skip extensive viewport debugging to reduce CPU
+          console.log(`� Taking ${viewport} screenshot with exact dimensions`);
           
-          // Get actual viewport dimensions to ensure screenshot matches exactly
+          // Get actual viewport dimensions quickly
           const actualViewport = await page.evaluate(() => ({
             width: window.innerWidth,
             height: window.innerHeight
           }));
-          
-          console.log(`📸 Taking ${viewport} screenshot with exact dimensions`);
+
           
           // Take screenshot with exact viewport dimensions (no scaling/distortion)
           const screenshot = await page.screenshot({
@@ -384,6 +386,9 @@ export class AccessibilityService {
     
     // Wait for page to be stable using shared utility
     await waitForPageReady(page, 500);
+
+    // Wait additional 3 seconds for page to fully load
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
     // Filter out non-visual violations
     const visualViolations = this.filterVisualViolations(violations);

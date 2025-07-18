@@ -18,7 +18,7 @@ export class ScreenshotService {
   static async takeScreenshot(options: ScreenshotOptions): Promise<Buffer> {
     // Add a hard timeout to prevent indefinite hanging
     const timeoutPromise = new Promise<Buffer>((_, reject) => {
-      setTimeout(() => reject(new Error('Screenshot timeout after 90 seconds')), 90000);
+      setTimeout(() => reject(new Error('Screenshot timeout after 60 seconds')), 60000); // Reduced from 90s to 60s
     });
 
     const screenshotPromise = this.attemptScreenshot(options);
@@ -61,17 +61,25 @@ export class ScreenshotService {
 
       console.log(`🌐 Navigating to: ${options.url}`);
       const navStartTime = Date.now();
-      await page.goto(options.url, { 
-        waitUntil: 'networkidle2', 
-        timeout: 60000 // Increased to match browser launch timeout
-      });
-      console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
+      try {
+        await page.goto(options.url, { 
+          waitUntil: 'domcontentloaded', // Changed from networkidle2 to domcontentloaded for faster loading
+          timeout: 30000 // Reduced timeout to 30 seconds
+        });
+        console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
+      } catch (navError) {
+        console.warn(`⚠️ Navigation timeout, continuing with screenshot: ${navError}`);
+        // Continue with screenshot even if navigation times out
+      }
 
       // Hide elements before screenshot using shared utility
       await hideElementsForScreenshot(page, options.hideSelectors);
 
       // Wait for page to be ready for screenshot
       await waitForPageReady(page);
+
+      // Wait additional 3 seconds for page to fully load
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       console.log(`📸 Taking screenshot...`);
       const screenshotStartTime = Date.now();
