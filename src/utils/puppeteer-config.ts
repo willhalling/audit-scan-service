@@ -1,6 +1,7 @@
 import { existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import chromium from '@sparticuz/chromium';
 
 export class PuppeteerConfig {
   /**
@@ -12,34 +13,75 @@ export class PuppeteerConfig {
     // Create unique userDataDir for each browser launch to prevent conflicts
     const userDataDir = join(tmpdir(), `chrome-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`);
     
+    // Use @sparticuz/chromium for better stability
+    const executablePath = isCloudRun 
+      ? await chromium.executablePath()
+      : this.findLocalChrome();
+    
     const config = {
       headless: true,
       timeout: 90000, // Increase timeout even more for debugging
       pipe: true, // CRITICAL: Use pipe instead of WebSocket - fixes WS endpoint timeout
       userDataDir, // Critical: unique directory prevents zombie processes
-      executablePath: isCloudRun ? '/usr/bin/google-chrome-stable' : this.findLocalChrome(),
+      executablePath,
       args: [
         '--no-sandbox',
-        '--disable-gpu',
-        '--disable-dev-shm-usage',
         '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        
+        // Aggressive GPU/WebGL disabling
+        '--disable-gpu',
+        '--disable-gpu-sandbox',
+        '--disable-gpu-compositing',
+        '--disable-gpu-rasterization',
+        '--disable-software-rasterizer',
+        '--use-gl=disabled',
+        '--disable-webgl',
+        '--disable-webgl2',
+        '--disable-3d-apis',
+        '--blacklist-accelerated-compositing',
+        '--blacklist-webgl',
+        
+        // Memory and process isolation
         '--no-zygote',
         '--single-process',
-        '--headless=new',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor,HttpsFirstBalancedModeAutoEnable',
+        '--memory-pressure-off',
+        '--max_old_space_size=4096',
         '--disable-ipc-flooding-protection',
+        '--js-flags=--max-old-space-size=4096',
+        
+        // Additional crash prevention
+        '--disable-crash-reporter',
+        '--disable-breakpad',
+        '--disable-logging',
+        '--disable-background-networking',
         '--disable-background-timer-throttling',
         '--disable-backgrounding-occluded-windows',
         '--disable-renderer-backgrounding',
+        '--disable-hang-monitor',
+        '--disable-prompt-on-repost',
+        '--disable-domain-reliability',
+        
+        // Browser optimization
+        '--headless=new',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor,HttpsFirstBalancedModeAutoEnable,AudioServiceOutOfProcess',
         '--disable-extensions',
         '--disable-plugins',
         '--disable-default-apps',
         '--no-first-run',
-        '--memory-pressure-off',
         '--disable-notifications',
         '--disable-component-extensions-with-background-pages',
-        '--disable-background-networking'
+        '--disable-client-side-phishing-detection',
+        '--disable-sync',
+        '--disable-translate',
+        '--hide-scrollbars',
+        '--metrics-recording-only',
+        '--mute-audio',
+        '--safebrowsing-disable-auto-update',
+        '--ignore-ssl-errors',
+        '--ignore-certificate-errors',
+        '--ignore-certificate-errors-spki-list'
       ]
     };
     

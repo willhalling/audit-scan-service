@@ -1,24 +1,13 @@
 #!/bin/bash
-# Deploy script for scan service - PRODUCTION environment
-# Requires "production" as first argument to prevent accidental production deployments
+# Deploy script for scan service - STAGING environment
 
-# Check if production flag is provided
-if [ "$1" != "production" ]; then
-  echo "❌ ERROR: This script deploys to PRODUCTION!"
-  echo "Usage: $0 production [project-id] [region]"
-  echo ""
-  echo "To deploy to staging instead, use: ./deploy-staging.sh"
-  echo "To deploy to production, use: ./deploy.sh production"
-  exit 1
-fi
-
-# Configuration
-PROJECT_ID=${2:-audit-scan}
-REGION=${3:-us-central1}
-SERVICE_NAME=scan-service
+# Configuration for staging
+PROJECT_ID=${1:-audit-scan}
+REGION=${2:-us-central1}
+SERVICE_NAME=scan-service-staging
 IMAGE=gcr.io/$PROJECT_ID/$SERVICE_NAME
 
-echo "🔥 Building and deploying $SERVICE_NAME to Cloud Run (PRODUCTION)..."
+echo "🚀 Building and deploying $SERVICE_NAME to Cloud Run (STAGING)..."
 
 # Build and push the image with cloudbuild
 echo "Building image with Cloud Build..."
@@ -35,7 +24,7 @@ if [ $? -ne 0 ]; then
 fi
 
 # Deploy to Cloud Run with appropriate resources
-echo "Deploying to Cloud Run..."
+echo "Deploying to Cloud Run (STAGING)..."
 
 # Load environment variables from .env file
 if [ -f .env ]; then
@@ -66,9 +55,9 @@ fi
 echo "✅ Firebase service account loaded from .env file (${#FIREBASE_SERVICE_ACCOUNT} characters)"
 echo "✅ OpenAI API key loaded from .env file (${#OPENAI_API_KEY} characters)"
 
-# Create env vars file to avoid shell escaping issues - production environment
-cat > /tmp/env-vars-production.yaml << EOF
-NODE_ENV: production
+# Create env vars file to avoid shell escaping issues - staging environment
+cat > /tmp/env-vars-staging.yaml << EOF
+NODE_ENV: staging
 PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
 OPENAI_API_KEY: ${OPENAI_API_KEY}
 FIREBASE_SERVICE_ACCOUNT: |
@@ -85,28 +74,28 @@ gcloud run deploy $SERVICE_NAME \
   --timeout 300 \
   --max-instances 10 \
   --port 8080 \
-  --env-vars-file=/tmp/env-vars-production.yaml \
-  --min-instances 1
+  --env-vars-file=/tmp/env-vars-staging.yaml \
+  --min-instances 0
 
 # Check if deployment succeeded
 if [ $? -ne 0 ]; then
   echo "❌ Deployment failed!"
-  rm -f /tmp/env-vars-production.yaml
+  rm -f /tmp/env-vars-staging.yaml
   exit 1
 fi
 
 # Clean up
-rm -f /tmp/env-vars-production.yaml
+rm -f /tmp/env-vars-staging.yaml
 
-echo "✅ PRODUCTION Deployment succeeded!"
+echo "✅ STAGING Deployment succeeded!"
 
 # Get the service URL
 echo "Getting service URL..."
 SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(status.url)")
-echo "✅ PRODUCTION Service URL: $SERVICE_URL"
+echo "✅ STAGING Service URL: $SERVICE_URL"
 echo "📝 This URL should remain consistent across deployments"
 
-echo "PRODUCTION Deployment complete!"
+echo "STAGING Deployment complete!"
 
 # Test the health endpoint
 echo "Testing health endpoint..."

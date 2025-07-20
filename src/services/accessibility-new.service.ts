@@ -5,7 +5,7 @@ import path from 'path';
 import { StorageService } from './storage.service.js';
 import { PageAccessibilityData } from '../types/index.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
-import { hideElementsForScreenshot, waitForPageReady } from '../utils/screenshot-helpers.js';
+import { hideElementsForScreenshot, waitForPageReady, blockAggressiveMapResources } from '../utils/screenshot-helpers.js';
 
 export class AccessibilityService {
   // Filter out non-visual violations that can't be annotated
@@ -112,58 +112,26 @@ export class AccessibilityService {
         await page.setViewport(viewportConfig);
         console.log(`♿ Set ${viewport} viewport: ${viewportConfig.width}x${viewportConfig.height} (mobile: ${viewportConfig.isMobile || false})`);
         
-        // Verify viewport was actually set correctly
-        const actualViewportAfterSet = await page.evaluate(() => ({
-          width: window.innerWidth,
-          height: window.innerHeight
-        }));
-        console.log(`♿ Actual viewport after setting: ${actualViewportAfterSet.width}x${actualViewportAfterSet.height}`);
-        
-        if (actualViewportAfterSet.width !== viewportConfig.width || actualViewportAfterSet.height !== viewportConfig.height) {
-          console.warn(`⚠️ Viewport mismatch! Expected: ${viewportConfig.width}x${viewportConfig.height}, Got: ${actualViewportAfterSet.width}x${actualViewportAfterSet.height}`);
+        // Strategy 1: Try normal approach first
+        let pageLoadedSuccessfully = false;
+        try {
+          await this.loadPageNormal(page, url, viewport);
+          pageLoadedSuccessfully = true;
+        } catch (error) {
+          console.log(`❌ Normal page load failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         
-        // For mobile, ensure proper responsive handling
-        if (viewport === 'mobile') {
-          // Set user agent to mobile to trigger responsive design
-          await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1');
-          
-          // Add viewport meta tag and force mobile CSS to apply at 596px width
-          await page.evaluateOnNewDocument(() => {
-            // Add viewport meta tag if not present
-            if (!document.querySelector('meta[name="viewport"]')) {
-              const meta = document.createElement('meta');
-              meta.name = 'viewport';
-              meta.content = 'width=device-width, initial-scale=1.0';
-              document.head.appendChild(meta);
-            }
-            
-            // Override CSS media queries to treat 596px as mobile
-            const style = document.createElement('style');
-            style.textContent = `
-              /* Force mobile styles to apply at 596px width */
-              @media (max-width: 768px) {
-                /* This will now apply to our 596px viewport */
-              }
-            `;
-            document.head.appendChild(style);
-          });
+        // Strategy 2: If normal failed, try aggressive map blocking
+        if (!pageLoadedSuccessfully) {
+          try {
+            console.log(`🛡️ Attempting aggressive map-blocking approach...`);
+            await this.loadPageWithAggressiveBlocking(page, url, viewport);
+            pageLoadedSuccessfully = true;
+          } catch (error) {
+            console.log(`❌ Aggressive approach also failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            throw error; // Re-throw to trigger retry
+          }
         }
-        
-        // Navigate with longer timeout and better error handling
-        await page.goto(url, { 
-          waitUntil: 'networkidle2', 
-          timeout: 60000 // Keep original timeout
-        });
-
-        // Hide elements before screenshot using shared utility
-        await hideElementsForScreenshot(page);
-
-        // Wait for page to be ready for screenshot (same as cover screenshot)
-        await waitForPageReady(page);
-        
-        // Wait additional 3 seconds for page to fully load
-        await new Promise(resolve => setTimeout(resolve, 3000));
 
         // Inject axe-core from local package to bypass CSP restrictions
         try {
@@ -276,7 +244,6 @@ export class AccessibilityService {
             height: window.innerHeight
           }));
 
-          
           // Take screenshot with exact viewport dimensions (no scaling/distortion)
           const screenshot = await page.screenshot({
             fullPage: false,
@@ -523,5 +490,86 @@ export class AccessibilityService {
       case 'minor': return '#0d9488';       // teal
       default: return '#6b7280';            // gray
     }
+  }
+
+  private static async loadPageNormal(page: any, url: string, viewport: string): Promise<void> {
+    console.log(`🌐 Normal navigation to: ${url} (${viewport})`);
+    
+    // For mobile, ensure proper responsive handling
+    if (viewport === 'mobile') {
+      // Set user agent to mobile to trigger responsive design
+      await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1');
+      
+      // Add viewport meta tag and force mobile CSS to apply at 596px width
+      await page.evaluateOnNewDocument(() => {
+        // Add viewport meta tag if not present
+        if (!document.querySelector('meta[name="viewport"]')) {
+          const meta = document.createElement('meta');
+          meta.name = 'viewport';
+          meta.content = 'width=device-width, initial-scale=1.0';
+          document.head.appendChild(meta);
+        }
+      });
+    }
+    
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded',
+      timeout: 30000
+    });
+    
+    // Hide elements using shared utility
+    await hideElementsForScreenshot(page);
+    await waitForPageReady(page);
+    
+    console.log(`✅ Normal page load completed for ${viewport}`);
+  }
+
+  private static async loadPageWithAggressiveBlocking(page: any, url: string, viewport: string): Promise<void> {
+    console.log(`🛡️ Aggressive navigation to: ${url} (${viewport}) with map blocking`);
+    
+    // For mobile, ensure proper responsive handling
+    if (viewport === 'mobile') {
+      // Set user agent to mobile to trigger responsive design
+      await page.setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1');
+      
+      // Add viewport meta tag and force mobile CSS to apply at 596px width
+      await page.evaluateOnNewDocument(() => {
+        // Add viewport meta tag if not present
+        if (!document.querySelector('meta[name="viewport"]')) {
+          const meta = document.createElement('meta');
+          meta.name = 'viewport';
+          meta.content = 'width=device-width, initial-scale=1.0';
+          document.head.appendChild(meta);
+        }
+      });
+    }
+    
+    // Block all map resources before navigation
+    await blockAggressiveMapResources(page);
+    
+    await page.goto(url, {
+      waitUntil: 'domcontentloaded', 
+      timeout: 25000 // Shorter timeout for aggressive mode
+    });
+    
+    // Hide elements and map containers
+    const mapSelectors = [
+      '[id*="map"]',
+      '[class*="map"]', 
+      '.leaflet-container',
+      '.mapboxgl-map',
+      '.google-map',
+      'iframe[src*="maps"]',
+      '.osm-map',
+      '#map',
+      '.map'
+    ];
+    
+    await hideElementsForScreenshot(page, mapSelectors);
+    
+    // Shorter wait for aggressive mode
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    console.log(`✅ Aggressive page load completed for ${viewport}`);
   }
 }

@@ -21,8 +21,74 @@ export const ELEMENTS_TO_HIDE = [
   '[id*="cookie"]',                  // Any element with "cookie" in ID
   '[class*="cookie"]',               // Any element with "cookie" in class
   '.popup-overlay',                  // Generic popup overlay
-  '.modal-backdrop'                  // Bootstrap modal backdrop
+  '.modal-backdrop',                 // Bootstrap modal backdrop
+  // Map-related elements to hide
+  '[id*="map"]',                     // Any element with "map" in ID
+  '[class*="map"]',                  // Any element with "map" in class
+  '.leaflet-container',              // Leaflet map container
+  '.mapboxgl-map',                   // Mapbox GL container
+  '.google-map',                     // Google Maps container
+  'iframe[src*="maps"]',             // Map iframes
+  '.osm-map'                         // OpenStreetMap container
 ];
+
+/**
+ * Block aggressive map resources and problematic domains
+ * @param page Puppeteer page instance
+ */
+export async function blockAggressiveMapResources(page: any): Promise<void> {
+  await page.setRequestInterception(true);
+  
+  page.on('request', (req: any) => {
+    const url = req.url();
+    const resourceType = req.resourceType();
+    
+    // Block all known map-related domains and resources
+    const blockedDomains = [
+      'openstreetmap.org',
+      'tile.openstreetmap.org', 
+      'tiles.openstreetmap.org',
+      'osm.org',
+      'tiles.hyteck.de',
+      'maps.googleapis.com',
+      'maps.google.com',
+      'mapbox.com',
+      'mapboxgl.com',
+      'leafletjs.com',
+      'unpkg.com/leaflet',
+      'cdnjs.cloudflare.com/ajax/libs/leaflet'
+    ];
+    
+    // Block specific resource patterns
+    const blockedPatterns = [
+      '/tiles/',
+      '/tile/',
+      '.tile',
+      'vector-tile',
+      'geojson',
+      'mapserver',
+      'wms',
+      'wmts',
+      'tms'
+    ];
+    
+    // Check if URL contains blocked domains or patterns
+    const shouldBlock = blockedDomains.some(domain => url.includes(domain)) ||
+                       blockedPatterns.some(pattern => url.includes(pattern)) ||
+                       (resourceType === 'image' && (url.includes('tile') || url.includes('map'))) ||
+                       (resourceType === 'xhr' && url.includes('tile')) ||
+                       (resourceType === 'fetch' && url.includes('tile'));
+    
+    if (shouldBlock) {
+      console.log(`🚫 BLOCKING: ${url}`);
+      req.abort();
+    } else {
+      req.continue();
+    }
+  });
+  
+  console.log(`�️ Aggressive map resource blocking enabled`);
+}
 
 /**
  * Hide specified elements on the page

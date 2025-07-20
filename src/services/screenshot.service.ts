@@ -3,7 +3,7 @@ import chromium from '@sparticuz/chromium';
 import { ScreenshotOptions, PageScreenshots } from '../types/index.js';
 import { StorageService } from './storage.service.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
-import { hideElementsForScreenshot, waitForPageReady } from '../utils/screenshot-helpers.js';
+import { hideElementsForScreenshot, waitForPageReady, blockAggressiveMapResources } from '../utils/screenshot-helpers.js';
 
 export class ScreenshotService {
   // Screenshot dimensions for different use cases
@@ -16,91 +16,112 @@ export class ScreenshotService {
   };
 
   static async takeScreenshot(options: ScreenshotOptions): Promise<Buffer> {
-    // Add a hard timeout to prevent indefinite hanging
-    const timeoutPromise = new Promise<Buffer>((_, reject) => {
-      setTimeout(() => reject(new Error('Screenshot timeout after 60 seconds')), 60000); // Reduced from 90s to 60s
-    });
-
-    const screenshotPromise = this.attemptScreenshot(options);
+    console.log(`📸 Starting screenshot for: ${options.url}`);
     
+    // Strategy 1: Normal screenshot attempt
     try {
-      return await Promise.race([screenshotPromise, timeoutPromise]);
+      console.log(`🔄 Attempting normal screenshot...`);
+      return await this.attemptNormalScreenshot(options);
     } catch (error) {
-      console.error('❌ Screenshot failed with timeout or error:', error);
-      throw error;
+      console.log(`❌ Normal screenshot failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    
+    // Strategy 2: Aggressive map-blocking screenshot
+    try {
+      console.log(`🛡️ Attempting aggressive map-blocking screenshot...`);
+      return await this.attemptAggressiveScreenshot(options);
+    } catch (error) {
+      console.error(`❌ All screenshot strategies failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error('Screenshot generation completely failed');
     }
   }
 
-  private static async attemptScreenshot(options: ScreenshotOptions): Promise<Buffer> {
-    // Clean up any leftover browser processes first
+  private static async attemptNormalScreenshot(options: ScreenshotOptions): Promise<Buffer> {
     await PuppeteerConfig.forceCleanup();
-    
-    // Get the single, simplified configuration
     const config = await PuppeteerConfig.getLaunchOptions();
     
-    console.log(`📸 Taking screenshot with simplified config`);
-    console.log(`🔧 Config: executablePath=${config.executablePath}, args=${JSON.stringify(config.args)}`);
-    
-    const launchStartTime = Date.now();
-    console.log(`🚀 Launching browser...`);
+    console.log(`🚀 Launching browser for normal screenshot...`);
     const browser = await puppeteer.launch(config);
-    console.log(`✅ Browser launched in ${Date.now() - launchStartTime}ms`);
 
     try {
-      const pageStartTime = Date.now();
-      console.log(`📄 Creating new page...`);
       const page = await browser.newPage();
-      console.log(`✅ New page created in ${Date.now() - pageStartTime}ms`);
       
       if (options.viewport) {
-        console.log(`📐 Setting viewport: ${JSON.stringify(options.viewport)}`);
         await page.setViewport(options.viewport);
-      } else {
-        console.log(`📐 Using default viewport`);
       }
 
       console.log(`🌐 Navigating to: ${options.url}`);
-      const navStartTime = Date.now();
-      try {
-        await page.goto(options.url, { 
-          waitUntil: 'domcontentloaded', // Changed from networkidle2 to domcontentloaded for faster loading
-          timeout: 30000 // Reduced timeout to 30 seconds
-        });
-        console.log(`✅ Page loaded in ${Date.now() - navStartTime}ms`);
-      } catch (navError) {
-        console.warn(`⚠️ Navigation timeout, continuing with screenshot: ${navError}`);
-        // Continue with screenshot even if navigation times out
-      }
+      await page.goto(options.url, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 30000
+      });
 
-      // Hide elements before screenshot using shared utility
+      // Hide elements before screenshot
       await hideElementsForScreenshot(page, options.hideSelectors);
-
-      // Wait for page to be ready for screenshot
       await waitForPageReady(page);
 
-      // Wait additional 3 seconds for page to fully load
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      console.log(`📸 Taking screenshot...`);
-      const screenshotStartTime = Date.now();
+      console.log(`📸 Taking normal screenshot...`);
       const screenshot = await page.screenshot({
         fullPage: options.fullPage || false,
         type: 'png'
       });
-      console.log(`✅ Screenshot captured in ${Date.now() - screenshotStartTime}ms`);
 
       return screenshot as Buffer;
     } finally {
-      // Ensure browser is properly closed
-      try {
-        console.log('🔄 Closing browser...');
-        await browser.close();
-        console.log('✅ Browser closed successfully');
-      } catch (closeError) {
-        console.warn('⚠️ Error closing browser:', closeError);
-        // Force cleanup if normal close fails
-        await PuppeteerConfig.forceCleanup();
+      await browser.close();
+    }
+  }
+
+  private static async attemptAggressiveScreenshot(options: ScreenshotOptions): Promise<Buffer> {
+    await PuppeteerConfig.forceCleanup();
+    const config = await PuppeteerConfig.getLaunchOptions();
+    
+    console.log(`� Launching browser for aggressive screenshot...`);
+    const browser = await puppeteer.launch(config);
+
+    try {
+      const page = await browser.newPage();
+      
+      if (options.viewport) {
+        await page.setViewport(options.viewport);
       }
+
+      // AGGRESSIVE: Block all map resources before navigation
+      await blockAggressiveMapResources(page);
+
+      console.log(`🌐 Navigating to: ${options.url} (with aggressive blocking)`);
+      await page.goto(options.url, { 
+        waitUntil: 'domcontentloaded',
+        timeout: 25000 // Shorter timeout for aggressive mode
+      });
+
+      // Hide elements and map containers
+      const mapSelectors = [
+        '[id*="map"]',
+        '[class*="map"]', 
+        '.leaflet-container',
+        '.mapboxgl-map',
+        '.google-map',
+        'iframe[src*="maps"]',
+        '.osm-map',
+        '#map',
+        '.map'
+      ];
+      
+      await hideElementsForScreenshot(page, [...(options.hideSelectors || []), ...mapSelectors]);
+      
+      // Shorter wait for aggressive mode
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      console.log(`📸 Taking aggressive screenshot...`);
+      const screenshot = await page.screenshot({
+        fullPage: options.fullPage || false,
+        type: 'png'
+      });
+
+      return screenshot as Buffer;
+    } finally {
+      await browser.close();
     }
   }
 
