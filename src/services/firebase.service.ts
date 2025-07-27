@@ -6,15 +6,15 @@ import { AuditResult, PageData } from '../types/index.js';
 
 const DEFAULT_FIREBASE_CONFIG = {
   "type": "service_account",
-  "project_id": "audit-scan",
-  "private_key_id": "123456abcdef",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDC1LQsXD4N6Ivq\nzrHOZKUTJvG/TshN+UeaVlGuyJDYb8Kcy+5Q+1jjQ7FBRczGTlvmFAPMEzP0+tbw\nxVFP8LMQo3QQT3cTKFbPm+eWEYVUU1sR15YnA29OYlmDpvKhIVPQ/l7D/ykVlMzr\nU0dpcZRoYVO/WTTKJFQaMZTG+fZ6OMlmZIZJ8ioFhqyWQ9hy0qXqk2lipJSuBnkZ\n7YqDt5EErPT10AS7A1Fbm7gJ9EKdCcx87bB+YiWkkIQvXJnKK7UCLS1A0QE7C91R\ntBIZsBnnITKZI2QXbMkUlgxaFvkZuEEoin7z8MNbktW654+A907S+L34ZZH2CDZh\nHEK4ZgSDAgMBAAECggEADvcbWxK317I4R3+w3zcQfKuF7d2NIoIEzR4h2ip9u3Kr\nRVNdMmVT81QX4I59jE4qGwQdLq8bJ1o517XxRvr9wKnMTQnFkqIJNLxRQQ2A10s+\noI2cF0smJPsV7gnboG7J+hO7WjVkVq1WlG6UfTgL0LDcLHY2Z+XBzZ+Y3FLmsSlt\nHd/SOhZ5TvYZVwKGEwvxo9qKjFIoRSuwxM7lYwvk+vOuQMUkR1UsCzu7AP0ZOy6i\nB9CtGR2nkgRnSRKEzZMMgEJ+zph1D6FXMhvIO/RzhWpt6v7LCpHcW7n4ULFwXpvD\nP2Plbb2A7iLUxnGBPjjNrOHj9/dBYWcKQnVXSYbT+QKBgQDj1Xw40/36ChpjCJFT\nzF6zBYjePdZwXB67alOh1m5Ex1fJZQnyWwVUqQUNpD3mOxFx0dXVPY8eLA8wF1aJ\nlfCow4ysbJ71iDkTMNMpI/nQsE/UA9LTaRdJKimKQBu4e5pLWkSJ4yZUiFw2kBWl\nDvd+C1YNKmvDAypk+XRCbbZ/ZQKBgQDaKSp5RUvbFZLEnuHC7oXPqcNCF1kxUF9I\nrd586TH6gIlKbVXyNmM3FeNEDQeic4rLpOS+Fs1zj066Nh5VLxbbs5/eeYGeQPMo\nzJ/TDRxZDxVmMvlFMCIGLBCj6YB+ZMzZ9ss4Ju9SKZ9Xatu3KQbNzeUzA1DHZjjL\nGCY2TYAXRwKBgQCU+LAU8qm9nSN3k/S5ZQ5EhnDFFAgJFJnXe5uJJZmHlcO+d1KJ\nMGTIz+CrZjIJEQpwgAGSVilJH2cDhGwcPlcF4nOr+TGpWADpBPMfmSNbztk0GWaT\nHJPeLYHQJrFwf9XD2XFvy48q9YOOtFxgPJA9K6xx3CQhKRNZg1W9PNB+0QKBgG9X\nPCYNt9LffuHQEuuYxcpwj6zsHDgffZ09EPXyWIGdtpCR3Tas2GHl0iXLmXoYSUol\nuxdXQGEjFwfYXKNTyfAHI5f8CwO92LvvtkMXmKT+1heTL15oAOkRbw3VvpiQ/iXi\nT7GPexWeVCXjB+0Y0fPiJJ+vWXGIyTggjGRENcxZAoGAI5XX3r3+g5l4KJ+nU3OJ\nDpu8vQKZBYvSnlr4nsLF3mgCC7hemrZJJTw5WLFiTrZ5rd6Wpn6+qQOgHWsj5pE7\nvcqcF6NV8uodsXItB7Gx1MLCVUxJ9noQ4+p/0X+GpE3KlhLnFTXUZmQBPx5jqh12\nQEwT7dJiwQp0WBEJnYtQN7g=\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-fbsvc@audit-scan.iam.gserviceaccount.com",
-  "client_id": "123456789012345678901",
+  "project_id": "audit-widget",
+  "private_key_id": "d37ea464823b557f8aa6499a93e89f1aa0770b17",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDAIskTDy0FqwBn\nuGUf5qFbInX5OwHyjnK+zcNRfGaiuLZ3vazleE0jr68N8Vz5lfkYmusEsyeDTPN8\n8R2qFDVzDlWlwtntDhmvEGoC+kveVdLjvWLuW0NuZjJ1nZPWCSIm374QbPRzrE2U\nUJADA1xBLUg7E+iKoOo2Qjiy4WLaEW3zVVcVcTycIOj14Q0ACm9kuXLpkkr4s3Ia\nvRRs28qdEML3qHuGs0JMzT28wwTbSWbp0Y/lLUFxFUmTKhHDvBm/10lWhBm8BBLf\n8SIsaxMj/rPZwk1mshX3jdkteThCKDgZ90SkuYTWmzs31w/n8QUUgv0A+FUZjWqQ\nueEr85ulAgMBAAECggEACcV7HmoGKySgN6YsFmw/RohBIbS7i59s/IEwbsN54Mqu\nFPbjhSQSID9+EqJ0zQiwi2zNiQanesj+FRuaG509fqV6+5wmQyUVb07RZWdfVmZc\n/FIUZvTjQAkYhdzGuPrr7rgwTVuNLxjTNTjHqi+QkIwCAWcoy2wVnT7O7WIDCf4E\nX3o/Y4m1grMArRW2i3GB1MIK5gtgFww24F5rW2EXLdev+MQOcIdF4+FaooHADB0o\n/cXyosfVGPGZK1iCyWoItfIyTk88g27KWP+Uodezvhiw0MueRVd2+c8u2POC+YF2\n/OHaSnQenOXNi60bEsA140cCoNTGdNOwssSlu72LYQKBgQDeoIb86uX/LM/nwrlh\n3z2IJIlvWMXkaG3znzw1YQpmfpzHbC7knGsm/v3gaJ8bNHarphPkQk67mj1Qi21g\n/oZW32RSrvu3pbL7bHbYO1ClUSdwbUR53cbxukj7S9ukl1m9CrCahShTNB94nddw\nja9/kgDnpa4ZJpPf5AXchjoyPQKBgQDc8CMofPN22wnGb2tJpax4Kp1CxYtVjntD\n6QIo37IqDre9wbLy9nB5sFXkXgTW/3F8IkHm4DPdkh/HflpKKTo03GKpMYO2I+Nt\nVpp/57T/d2gNd6wPN60iJPxPUOHdUw72FDQ3qAXcEdKYeWHNS2kHRv1xnWPxUpbN\nsUj8jYItiQKBgFxPJ2mbZH5n8FTissdYL0VSEQJwRq2sd1q6vdZMRGm3Of6eZts3\n2F41AMOZ3c8D8+i8VichL1AuZhoNle7P2pgOzKRUFd9R/2Ks2KJUBd5mRfoh9HCr\neqAkY7p++7XFY9o0ooGPkObfB+WVXQ04UnqM6X8jfYrEKjB9dci4h0zpAoGAVJ0X\nKetopo1OmhOTyDnN6puPbMIREawmoyR6skKxjg/i6KZlLU2aV9BjpLkpK1nbEYph\nKNWWp3XN++31EE/nvdTlaBzRb5EhCX/QXcnUdL47OGUrnQxanygBBTNZvRSRN0cX\nlHUiAV1GBST/gsstpx7V84wueX6CyLXr2OUtBNkCgYEAxCLmNfB1TJYJEjLyvO2N\ndBKVeTdtWHvDbzbe0YjPH528qKIeQVZh08jienwVGXe0wPw8thl/90Q/xjlWYiUp\nKKicH85oJ60KJIYq0HaRfDAU/Ko/2m18B7Ey5hK8dA7Gy+dHJFzPfrPpvaFVpqPY\ndOz8KLHhMYXHhpjjd0wTNIU=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@audit-widget.iam.gserviceaccount.com",
+  "client_id": "101835604209885374656",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
   "token_uri": "https://oauth2.googleapis.com/token",
   "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40audit-scan.iam.gserviceaccount.com",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40audit-widget.iam.gserviceaccount.com",
   "universe_domain": "googleapis.com"
 };
 
@@ -73,8 +73,8 @@ class FirebaseService {
         console.log('Initializing Firebase with config...');
         this.app = initializeApp({
           credential: cert(serviceAccount),
-          projectId: 'audit-scan',
-          storageBucket: 'audit-scan.firebasestorage.app'
+          projectId: 'audit-widget',
+          storageBucket: 'audit-widget.firebasestorage.app'
         });
       } else {
         console.log('Using existing Firebase app');

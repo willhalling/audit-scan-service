@@ -298,7 +298,16 @@ export class AccessibilityService {
           };
         });
 
-        await browser.close();
+        // Close browser with timeout to prevent hanging on animated content
+        try {
+          await Promise.race([
+            browser.close(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 10000))
+          ]);
+        } catch (closeError) {
+          console.warn(`⚠️ Browser close failed for ${viewport}, force killing:`, closeError);
+          try { browser.process()?.kill('SIGKILL'); } catch {}
+        }
         
         const result: { violations: any[]; annotatedScreenshotUrl?: string } = {
           violations: formattedViolations
@@ -317,9 +326,12 @@ export class AccessibilityService {
         // Clean up browser if it exists
         if (browser) {
           try {
-            await browser.close();
+            await Promise.race([
+              browser.close(),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 5000))
+            ]);
           } catch (closeError) {
-            console.warn('Failed to close browser:', closeError);
+            try { browser.process()?.kill('SIGKILL'); } catch {}
           }
         }
         

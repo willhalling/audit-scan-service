@@ -2,7 +2,7 @@ import { getStorage } from 'firebase-admin/storage';
 
 export class StorageService {
   private static getBucket() {
-    const bucketName = 'audit-scan.firebasestorage.app';
+    const bucketName = 'audit-widget.firebasestorage.app';
     console.log(`Using storage bucket: ${bucketName}`);
     return getStorage().bucket(bucketName);
   }

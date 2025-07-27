@@ -3,7 +3,7 @@
 
 SERVICE_NAME=${1:-scan-service}
 REGION=${2:-us-central1}
-PROJECT_ID=${3:-audit-scan}
+PROJECT_ID=${3:-audit-widget}
 
 echo "Diagnosing Cloud Run service: $SERVICE_NAME"
 echo "----------------------------------------"

@@ -13,7 +13,7 @@ if [ "$1" != "production" ]; then
 fi
 
 # Configuration
-PROJECT_ID=${2:-audit-scan}
+PROJECT_ID=${2:-audit-widget}
 REGION=${3:-us-central1}
 SERVICE_NAME=scan-service
 IMAGE=gcr.io/$PROJECT_ID/$SERVICE_NAME
@@ -80,8 +80,8 @@ gcloud run deploy $SERVICE_NAME \
   --platform managed \
   --region $REGION \
   --allow-unauthenticated \
-  --memory 16Gi \
-  --cpu 4 \
+  --memory 1Gi \
+  --cpu 1 \
   --timeout 300 \
   --max-instances 10 \
   --port 8080 \
@@ -102,7 +102,8 @@ echo "✅ PRODUCTION Deployment succeeded!"
 
 # Get the service URL
 echo "Getting service URL..."
-SERVICE_URL=$(gcloud run services describe $SERVICE_NAME --region=$REGION --format="value(status.url)")
+SERVICE_URL=$(gcloud run services describe $SERVI
+NAME --region=$REGION --format="value(status.url)")
 echo "✅ PRODUCTION Service URL: $SERVICE_URL"
 echo "📝 This URL should remain consistent across deployments"
 
