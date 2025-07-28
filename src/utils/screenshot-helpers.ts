@@ -101,6 +101,9 @@ export async function hideElementsForScreenshot(
 ): Promise<void> {
   const allSelectors = [...ELEMENTS_TO_HIDE, ...additionalSelectors];
   
+  // Wait for late-loading elements like cookie banners to appear
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  
   await page.evaluate((selectors: string[]) => {
     console.log(`🙈 Attempting to hide ${selectors.length} element types`);
     let hiddenCount = 0;

@@ -108,10 +108,11 @@ export class ScreenshotService {
         '.map'
       ];
       
-      await hideElementsForScreenshot(page, [...(options.hideSelectors || []), ...mapSelectors]);
-      
       // Shorter wait for aggressive mode
       await new Promise(resolve => setTimeout(resolve, 2000));
+
+      await hideElementsForScreenshot(page, [...(options.hideSelectors || []), ...mapSelectors]);
+      
 
       console.log(`📸 Taking aggressive screenshot...`);
       const screenshot = await page.screenshot({

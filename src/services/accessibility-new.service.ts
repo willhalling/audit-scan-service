@@ -530,8 +530,8 @@ export class AccessibilityService {
     });
     
     // Hide elements using shared utility
-    await hideElementsForScreenshot(page);
     await waitForPageReady(page);
+    await hideElementsForScreenshot(page);
     
     console.log(`✅ Normal page load completed for ${viewport}`);
   }
