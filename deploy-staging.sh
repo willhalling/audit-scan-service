@@ -76,7 +76,9 @@ gcloud run deploy $SERVICE_NAME \
   --max-instances 10 \
   --port 8080 \
   --env-vars-file=/tmp/env-vars-staging.yaml \
-  --min-instances 0
+  --min-instances 0 \
+  --execution-environment gen2 \
+  --cpu-boost
 
 # Check if deployment succeeded
 if [ $? -ne 0 ]; then
