@@ -16,7 +16,8 @@ fi
 PROJECT_ID=${2:-audit-widget}
 REGION=${3:-us-central1}
 SERVICE_NAME=scan-service
-IMAGE=gcr.io/$PROJECT_ID/$SERVICE_NAME
+# Use Artifact Registry instead of deprecated GCR
+IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$SERVICE_NAME
 
 echo "🔥 Building and deploying $SERVICE_NAME to Cloud Run (PRODUCTION)..."
 
@@ -80,8 +81,8 @@ gcloud run deploy $SERVICE_NAME \
   --platform managed \
   --region $REGION \
   --allow-unauthenticated \
-  --memory 1Gi \
-  --cpu 1 \
+  --memory 2Gi \
+  --cpu 2 \
   --timeout 300 \
   --max-instances 10 \
   --port 8080 \

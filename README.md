@@ -394,7 +394,7 @@ When making changes:
 
 ## License
 
-This service is part of the AuditScan.ai application.
+This service is part of the AuditWidget.com application.
 
 ## Using This API from Next.js (or Any Frontend)
 

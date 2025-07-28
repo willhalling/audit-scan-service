@@ -2,10 +2,11 @@
 # Deploy script for scan service - STAGING environment
 
 # Configuration for staging
-PROJECT_ID=${1:-audit-scan}
+PROJECT_ID=${1:-audit-widget}
 REGION=${2:-us-central1}
 SERVICE_NAME=scan-service-staging
-IMAGE=gcr.io/$PROJECT_ID/$SERVICE_NAME
+# Use Artifact Registry instead of deprecated GCR
+IMAGE=us-central1-docker.pkg.dev/$PROJECT_ID/cloud-run-source-deploy/$SERVICE_NAME
 
 echo "🚀 Building and deploying $SERVICE_NAME to Cloud Run (STAGING)..."
 
