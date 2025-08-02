@@ -70,6 +70,62 @@ export interface ContentAnalysis {
   sentimentScore: number;
 }
 
+export interface CTAStyleData {
+  text: string;
+  selector: string;
+  styles: {
+    backgroundColor: string;
+    color: string;
+    fontSize: string;
+    fontWeight: string;
+    padding: string;
+    margin: string;
+    borderRadius: string;
+    border: string;
+    width: string;
+    height: string;
+    position: string;
+    zIndex: string;
+  };
+  dimensions: {
+    width: number;
+    height: number;
+  };
+  position: {
+    x: number;
+    y: number;
+  };
+  isVisible: boolean;
+  contrastRatio?: number;
+  accessibilityScore?: 'AA' | 'AAA' | 'Fail';
+}
+
+export interface CTAAnalysisResult {
+  totalCTAs: number;
+  analyzedCTAs: CTAStyleData[];
+  skippedCount: number;
+  averageSize: {
+    width: number;
+    height: number;
+  };
+  colorAnalysis: {
+    uniqueBackgroundColors: string[];
+    uniqueTextColors: string[];
+    hasGoodContrast: boolean;
+    contrastIssues: number;
+  };
+  sizingAnalysis: {
+    tooSmall: number;
+    optimal: number;
+    tooLarge: number;
+  };
+  positioningAnalysis: {
+    aboveFold: number;
+    belowFold: number;
+    fixed: number;
+  };
+}
+
 export interface AccessibilityViolation {
   id: string;
   impact: 'minor' | 'moderate' | 'serious' | 'critical';
@@ -146,6 +202,8 @@ export interface AuditRequest {
   pages?: string[]; // Array of up to 5 page paths (e.g. ['/about', '/contact'])
   authorUid?: string; // Optional author UID to associate with the audit
   enableAI?: boolean; // Optional flag to enable/disable AI analysis (default: true)
+  enableCTAAnalysis?: boolean; // Optional flag to enable/disable CTA visual analysis (default: true)
+  maxCTAsToAnalyze?: number; // Optional limit for CTA analysis performance (default: 3)
 }
 
 export interface PageMeta {
@@ -165,6 +223,12 @@ export interface PageHeaders {
   h4: string[];
   h5: string[];
   h6: string[];
+}
+
+export interface HeaderStructureAnalysis {
+  hasLogicalOrder: boolean;
+  structureIssues: string[];
+  headerCount: { h1: number; h2: number; h3: number; h4: number; h5: number; h6: number };
 }
 
 export interface PageScreenshots {
@@ -220,6 +284,7 @@ export interface PageData {
   bodyText: string;
   textToHtmlRatio: number;
   headers: PageHeaders;
+  headerStructure: HeaderStructureAnalysis;
   hasSingleH1: boolean;
   screenshots: PageScreenshots;
   wordCount?: number;
@@ -238,7 +303,26 @@ export interface PageData {
     inputs: number;
     requiredFields: number;
     buttons: number;
+    hasEmailField?: boolean;
+    hasPhoneField?: boolean;
+    hasNameField?: boolean;
   }>;
+  trustSignals?: {
+    hasSSLIndicators: boolean;
+    hasPaymentLogos: boolean;
+    hasSecurityBadges: boolean;
+    hasTestimonials: boolean;
+    hasReviews: boolean;
+    hasPrivacyPolicy: boolean;
+    hasRefundPolicy: boolean;
+  };
+  analyticsTracking?: {
+    hasGoogleAnalytics: boolean;
+    hasGTM: boolean;
+    hasFacebookPixel: boolean;
+    hasHotjar: boolean;
+    hasOtherTracking: boolean;
+  };
   issues?: Array<{
     issue: string;
     suggestion: string;
@@ -253,8 +337,10 @@ export interface PageData {
   lighthouseMobile?: ReducedLighthouseData;
   accessibilityDesktop?: { violations: ReducedAccessibilityViolation[] };
   accessibilityMobile?: { violations: ReducedAccessibilityViolation[] };
+  ctaAnalysis?: CTAAnalysisResult;
   wordCloudData?: WordCloudData[];
   ai?: AIAnalysis;
+  conversionOptimization?: ConversionOptimizationAnalysis;
 }
 
 export interface AuditResult {
@@ -295,4 +381,19 @@ export interface ReducedLighthouseData {
     suggestion: string;
     severity: 'critical' | 'serious' | 'moderate' | 'minor';
   }>;
+}
+
+export interface QuestionItem {
+  question: string;
+  assessment: string;
+  recommendation: string;
+}
+
+export interface ConversionOptimizationAnalysis {
+  landingPageBasics?: QuestionItem[];
+  callsToAction?: QuestionItem[];
+  salesCopyMessaging?: QuestionItem[];
+  trustCredibility?: QuestionItem[];
+  testingAnalytics?: QuestionItem[];
+  funnelFlow?: QuestionItem[];
 }

@@ -4,6 +4,7 @@ import { firebaseService } from './firebase.service.js';
 import { ScrapeService } from './scrape.service.js';
 import { ScreenshotService } from './screenshot.service.js';
 import { AccessibilityService } from './accessibility-new.service.js';
+import { CTAAnalysisService } from './cta-analysis.service.js';
 
 export class AuditService {
 
@@ -149,6 +150,30 @@ export class AuditService {
         } catch (lighthouseError) {
           console.error(`⚠️ Lighthouse audit failed for ${pageData.url}:`, lighthouseError);
         }
+
+        // Run CTA visual analysis if CTAs are present
+        if (pageData.ctas && pageData.ctas.length > 0) {
+          try {
+            console.log(`🎯 Running CTA visual analysis for ${pageData.url} (${pageData.ctas.length} CTAs found)`);
+            const ctaAnalysis = await CTAAnalysisService.analyzeCTAs(pageData.url, {
+              enabled: request.enableCTAAnalysis ?? true, // Default enabled, can be disabled via request
+              maxCTAs: request.maxCTAsToAnalyze ?? 3, // Default 3, configurable via request
+              useExistingBrowser: false // Use separate browser for now, can optimize later
+            });
+            
+            if (ctaAnalysis) {
+              pageData.ctaAnalysis = ctaAnalysis;
+              console.log(`✅ CTA visual analysis completed for ${pageData.url}: ${ctaAnalysis.analyzedCTAs.length} CTAs analyzed`);
+            } else {
+              console.log(`⚠️ CTA visual analysis returned null for ${pageData.url}`);
+            }
+          } catch (ctaError) {
+            console.error(`⚠️ CTA visual analysis failed for ${pageData.url}:`, ctaError);
+            // Continue without CTA analysis - don't break the audit
+          }
+        } else {
+          console.log(`ℹ️ Skipping CTA visual analysis for ${pageData.url} - no CTAs found`);
+        }
         
         console.log(`📊 Final screenshots (3 total):`, allScreenshots);
         
@@ -167,6 +192,19 @@ export class AuditService {
         } catch (aiError) {
           console.error(`⚠️ AI analysis failed for ${pageData.url}:`, aiError);
           // Continue without AI analysis
+        }
+      }
+
+      // Run conversion optimization analysis on each page
+      console.log(`🎯 Running conversion optimization analysis on ${pages.length} pages`);
+      for (const pageData of pages) {
+        try {
+          const conversionAnalysis = await (await import('./conversion-optimization.service.js')).ConversionOptimizationService.analyzePageForConversion(pageData, request.enableAI ?? true);
+          pageData.conversionOptimization = conversionAnalysis;
+          console.log(`✅ Conversion optimization analysis completed for ${pageData.url}`);
+        } catch (conversionError) {
+          console.error(`⚠️ Conversion optimization analysis failed for ${pageData.url}:`, conversionError);
+          // Continue without conversion optimization analysis
         }
       }
 

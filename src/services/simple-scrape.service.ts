@@ -1,7 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { generateHeaders } from '../utils/helpers.js';
-import { PageData, PageMeta, PageHeaders } from '../types/index.js';
+import { PageData, PageMeta, PageHeaders, HeaderStructureAnalysis } from '../types/index.js';
 
 export class SimpleScrapeService {
   
@@ -46,6 +46,62 @@ export class SimpleScrapeService {
     return Math.round((text.length / html.length) * 100) / 100;
   }
 
+  static analyzeHeaderStructure($: cheerio.CheerioAPI): HeaderStructureAnalysis {
+    const headerCount = {
+      h1: $('h1').length,
+      h2: $('h2').length,
+      h3: $('h3').length,
+      h4: $('h4').length,
+      h5: $('h5').length,
+      h6: $('h6').length
+    };
+
+    const structureIssues: string[] = [];
+    let hasLogicalOrder = true;
+
+    // Check for multiple H1s
+    if (headerCount.h1 === 0) {
+      structureIssues.push('Missing H1 tag');
+      hasLogicalOrder = false;
+    } else if (headerCount.h1 > 1) {
+      structureIssues.push(`Multiple H1 tags found (${headerCount.h1})`);
+      hasLogicalOrder = false;
+    }
+
+    // Check for logical hierarchy (H1 should come before H2, H2 before H3, etc.)
+    const headerElements = $('h1, h2, h3, h4, h5, h6').toArray();
+    let lastLevel = 0;
+
+    headerElements.forEach((el, index) => {
+      const currentLevel = parseInt(el.tagName.charAt(1));
+      
+      if (index === 0 && currentLevel !== 1) {
+        structureIssues.push(`First heading is H${currentLevel}, should be H1`);
+        hasLogicalOrder = false;
+      }
+      
+      if (currentLevel > lastLevel + 1) {
+        structureIssues.push(`Header level jumps from H${lastLevel} to H${currentLevel} (skipped levels)`);
+        hasLogicalOrder = false;
+      }
+      
+      lastLevel = currentLevel;
+    });
+
+    // Check for empty headers
+    const emptyHeaders = headerElements.filter(el => !$(el).text().trim());
+    if (emptyHeaders.length > 0) {
+      structureIssues.push(`${emptyHeaders.length} empty header(s) found`);
+      hasLogicalOrder = false;
+    }
+
+    return {
+      hasLogicalOrder,
+      structureIssues,
+      headerCount
+    };
+  }
+
   static async scrapePage(url: string): Promise<PageData> {
     console.log(`🔍 Scraping: ${url}`);
     
@@ -59,6 +115,7 @@ export class SimpleScrapeService {
 
     const meta = this.extractMeta($);
     const headers = this.extractHeaders($);
+    const headerStructure = this.analyzeHeaderStructure($);
     const ctas = this.extractCTAs($);
     const bodyText = this.extractBodyText($);
     const textToHtmlRatio = this.getTextToHtmlRatio(html);
@@ -79,6 +136,7 @@ export class SimpleScrapeService {
       bodyText,
       textToHtmlRatio,
       headers,
+      headerStructure,
       hasSingleH1,
       screenshots: {} // Will be populated by screenshot service
     };

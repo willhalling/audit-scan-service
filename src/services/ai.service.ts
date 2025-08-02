@@ -114,7 +114,19 @@ Provide analysis and suggestions in this exact JSON structure:
   }
 }
 
-Be specific and actionable in suggestions.`;
+IMPORTANT: For suggestions, provide the actual improved text/content directly, not explanatory text. 
+- For meta title suggestion: provide the actual improved title text (single line, max 60 characters)
+- For meta description suggestion: provide the actual improved description text (single line, max 160 characters)
+- For heading suggestion: provide the actual improved heading text (single line)
+- For CTA suggestion: provide the actual improved CTA text (single line, max 10 words)
+- For tone/readability/intent suggestions: provide detailed, comprehensive single-line actionable text improvements
+
+FORMATTING RULES:
+- All suggestions must be single line text only
+- No bullet points, line breaks, or multi-line formatting
+- No special characters or symbols
+- Make suggestions detailed and comprehensive while keeping them on one line
+- Do not include phrases like "Consider adding", "For example", or other explanatory text`;
   }
 
   private static getDummyAnalysis(): AIAnalysis {
