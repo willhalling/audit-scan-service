@@ -189,8 +189,8 @@ export interface AIAnalysis {
     description: AIAnalysisSection;
   };
   content: {
-    heading: AIAnalysisSection;
-    cta: AIAnalysisSection;
+    heading?: AIAnalysisSection;
+    cta?: AIAnalysisSection;
     tone: AIAnalysisSection;
     readability: AIAnalysisSection;
     intent: AIAnalysisSection;

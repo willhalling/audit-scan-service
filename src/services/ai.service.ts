@@ -91,14 +91,6 @@ Provide analysis and suggestions in this exact JSON structure:
     }
   },
   "content": {
-    "heading": {
-      "analysis": "Analysis of H1 heading effectiveness",
-      "suggestion": "Specific suggestion"
-    },
-    "cta": {
-      "analysis": "Analysis of call-to-action effectiveness",
-      "suggestion": "Specific suggestion"
-    },
     "tone": {
       "analysis": "Analysis of content tone and voice",
       "suggestion": "Specific suggestion"
@@ -117,8 +109,6 @@ Provide analysis and suggestions in this exact JSON structure:
 IMPORTANT: For suggestions, provide the actual improved text/content directly, not explanatory text. 
 - For meta title suggestion: provide the actual improved title text (single line, max 60 characters)
 - For meta description suggestion: provide the actual improved description text (single line, max 160 characters)
-- For heading suggestion: provide the actual improved heading text (single line)
-- For CTA suggestion: provide the actual improved CTA text (single line, max 10 words)
 - For tone/readability/intent suggestions: provide detailed, comprehensive single-line actionable text improvements
 
 FORMATTING RULES:
@@ -134,33 +124,25 @@ FORMATTING RULES:
       meta: {
         title: {
           analysis: "Meta title appears to be optimized for search engines with relevant keywords",
-          suggestions: "Consider adding emotional triggers"
+          suggestions: "Boost Local SEO Rankings with Expert Digital Marketing"
         },
         description: {
           analysis: "Meta description provides good overview but could be more compelling",
-          suggestions: "Add call-to-action in description"
+          suggestions: "Get more customers with proven digital marketing strategies that increase online visibility and drive real business results"
         }
       },
       content: {
-        heading: {
-          analysis: "H1 heading is clear but could be more benefit-focused",
-          suggestions: "Lead with primary benefit"
-        },
-        cta: {
-          analysis: "Call-to-actions are present but could be more compelling",
-          suggestions: "Use action-oriented language"
-        },
         tone: {
           analysis: "Content tone is professional and informative",
-          suggestions: "Add more personality"
+          suggestions: "Adopt a more conversational and personal tone that speaks directly to customer pain points and builds emotional connection"
         },
         readability: {
           analysis: "Content is generally readable but could be improved",
-          suggestions: "Use shorter sentences"
+          suggestions: "Break up long paragraphs into shorter sentences and use simpler language to improve comprehension and engagement"
         },
         intent: {
           analysis: "Content aligns well with likely user intent",
-          suggestions: "Address common objections"
+          suggestions: "Address specific user concerns and provide clear next steps that guide visitors toward taking action"
         }
       }
     };

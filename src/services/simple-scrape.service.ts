@@ -1,6 +1,7 @@
 import axios from 'axios';
 import * as cheerio from 'cheerio';
 import { generateHeaders } from '../utils/helpers.js';
+import { ScrapeHelpers } from '../utils/scrape-helpers.js';
 import { PageData, PageMeta, PageHeaders, HeaderStructureAnalysis } from '../types/index.js';
 
 export class SimpleScrapeService {
@@ -19,7 +20,7 @@ export class SimpleScrapeService {
 
   static extractHeaders($: cheerio.CheerioAPI): PageHeaders {
     return {
-      h1: $('h1').first().text().trim() || '',
+      h1: ScrapeHelpers.extractCleanH1($) || '',
       h2: $('h2').map((_, el) => $(el).text().trim()).get(),
       h3: $('h3').map((_, el) => $(el).text().trim()).get(),
       h4: $('h4').map((_, el) => $(el).text().trim()).get(),
