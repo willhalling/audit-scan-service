@@ -1,6 +1,6 @@
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { AuditResult, PageData } from '../types/index.js';
+import { AuditResult, PageData, MozAnalysisResult } from '../types/index.js';
 
 // Default Firebase config
 
@@ -158,6 +158,121 @@ class FirebaseService {
     const doc = await this.db.collection('audits').doc(auditId).get();
     return doc.exists ? doc.data() as AuditResult : null;
   }
+
+  /**
+   * Save MOZ analysis data to a specific page within an audit
+   */
+  async saveMozDataToPage(auditId: string, pageUrl: string, mozData: MozAnalysisResult): Promise<void> {
+    if (!this.db) throw new Error('Firestore is not initialized');
+    
+    try {
+      const auditDoc = await this.db.collection('audits').doc(auditId).get();
+      if (!auditDoc.exists) {
+        throw new Error(`Audit ${auditId} not found`);
+      }
+
+      const auditData = auditDoc.data() as AuditResult;
+      const pages = auditData.pages || [];
+
+      // Find the page and add MOZ data
+      const pageIndex = pages.findIndex(page => page.url === pageUrl);
+      if (pageIndex === -1) {
+        throw new Error(`Page ${pageUrl} not found in audit ${auditId}`);
+      }
+
+      // Clean and add MOZ data to the page
+      pages[pageIndex].mozData = this.cleanData(mozData);
+
+      // Update the audit with the modified pages
+      await this.db.collection('audits').doc(auditId).update({
+        pages: this.cleanData(pages)
+      });
+
+      console.log(`✅ MOZ data saved for ${pageUrl} in audit ${auditId}`);
+    } catch (error) {
+      console.error(`❌ Failed to save MOZ data for ${pageUrl}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save MOZ data as a separate collection document
+   */
+  async saveMozAnalysis(auditId: string, pageUrl: string, mozData: MozAnalysisResult): Promise<void> {
+    if (!this.db) throw new Error('Firestore is not initialized');
+    
+    try {
+      const docId = `${auditId}_${Buffer.from(pageUrl).toString('base64').replace(/[/+=]/g, '_')}`;
+      
+      const mozDocument = {
+        auditId,
+        pageUrl,
+        ...this.cleanData(mozData),
+        savedAt: Date.now()
+      };
+
+      await this.db.collection('moz_analyses').doc(docId).set(mozDocument);
+      console.log(`✅ MOZ analysis saved to collection for ${pageUrl}`);
+    } catch (error) {
+      console.error(`❌ Failed to save MOZ analysis for ${pageUrl}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get MOZ data for a specific page in an audit
+   */
+  async getMozDataForPage(auditId: string, pageUrl: string): Promise<MozAnalysisResult | null> {
+    if (!this.db) throw new Error('Firestore is not initialized');
+    
+    try {
+      const docId = `${auditId}_${Buffer.from(pageUrl).toString('base64').replace(/[/+=]/g, '_')}`;
+      const doc = await this.db.collection('moz_analyses').doc(docId).get();
+      
+      if (!doc.exists) return null;
+      
+      const data = doc.data();
+      if (!data) return null;
+
+      // Remove Firestore metadata and return MOZ data
+      const { auditId: _, pageUrl: __, savedAt: ___, ...mozData } = data;
+      return mozData as MozAnalysisResult;
+    } catch (error) {
+      console.error(`❌ Failed to get MOZ data for ${pageUrl}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all MOZ analyses for an audit
+   */
+  async getAllMozDataForAudit(auditId: string): Promise<Array<{ pageUrl: string; data: MozAnalysisResult }>> {
+    if (!this.db) throw new Error('Firestore is not initialized');
+    
+    try {
+      const snapshot = await this.db.collection('moz_analyses')
+        .where('auditId', '==', auditId)
+        .get();
+
+      const results: Array<{ pageUrl: string; data: MozAnalysisResult }> = [];
+      
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data) {
+          const { auditId: _, pageUrl, savedAt: __, ...mozData } = data;
+          results.push({
+            pageUrl,
+            data: mozData as MozAnalysisResult
+          });
+        }
+      });
+
+      return results;
+    } catch (error) {
+      console.error(`❌ Failed to get all MOZ data for audit ${auditId}:`, error);
+      return [];
+    }
+  }
 }
 
 // Export a factory function instead of instantiating immediately
@@ -194,5 +309,22 @@ export const firebaseService = {
   
   async getAudit(auditId: string) {
     return this.instance.getAudit(auditId);
+  },
+
+  // MOZ Data methods
+  async saveMozDataToPage(auditId: string, pageUrl: string, mozData: MozAnalysisResult) {
+    return this.instance.saveMozDataToPage(auditId, pageUrl, mozData);
+  },
+
+  async saveMozAnalysis(auditId: string, pageUrl: string, mozData: MozAnalysisResult) {
+    return this.instance.saveMozAnalysis(auditId, pageUrl, mozData);
+  },
+
+  async getMozDataForPage(auditId: string, pageUrl: string) {
+    return this.instance.getMozDataForPage(auditId, pageUrl);
+  },
+
+  async getAllMozDataForAudit(auditId: string) {
+    return this.instance.getAllMozDataForAudit(auditId);
   }
 };
