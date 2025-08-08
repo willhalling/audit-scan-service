@@ -23,6 +23,97 @@ export class AccessibilityService {
     MOBILE: { width: 596, height: 1484 }   // Exact mobile image dimensions needed
   };
 
+  private static async injectAxeCore(page: any): Promise<void> {
+    console.log('📦 Attempting to inject axe-core...');
+    
+    // First try to load locally bundled axe-core
+    try {
+      const axeCoreDir = path.resolve(process.cwd(), 'node_modules', 'axe-core');
+      let axeCoreScript: string;
+      
+      try {
+        // Try to load from the main dist file
+        const axeCoreMainPath = path.join(axeCoreDir, 'axe.min.js');
+        if (fs.existsSync(axeCoreMainPath)) {
+          console.log('📦 Loading axe-core from main path...');
+          axeCoreScript = fs.readFileSync(axeCoreMainPath, 'utf8');
+        } else {
+          // Fallback to alternative path
+          console.log('📦 Loading axe-core from dist path...');
+          const axeCoreAltPath = path.join(axeCoreDir, 'dist', 'axe.min.js');
+          axeCoreScript = fs.readFileSync(axeCoreAltPath, 'utf8');
+        }
+        
+        // Inject the script content directly with timeout
+        console.log('📦 Injecting axe-core script content...');
+        await Promise.race([
+          page.addScriptTag({ content: axeCoreScript }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Script injection timeout')), 10000))
+        ]);
+        
+        console.log('✅ Axe-core injected from local package');
+        return;
+        
+      } catch (localError) {
+        console.warn('📦 Failed to load axe-core from local package:', localError);
+        throw localError; // Let it fall through to CDN fallback
+      }
+      
+    } catch (localError) {
+      console.warn('📦 Local axe-core injection failed, trying CDN fallback...');
+      
+      // First CDN fallback with timeout
+      try {
+        console.log('📦 Trying primary CDN...');
+        await Promise.race([
+          page.addScriptTag({
+            url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
+          }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Primary CDN timeout')), 8000))
+        ]);
+        console.log('✅ Axe-core loaded from primary CDN');
+        return;
+        
+      } catch (primaryCdnError) {
+        console.warn('📦 Primary CDN failed:', primaryCdnError);
+        
+        // Second CDN fallback with timeout
+        try {
+          console.log('📦 Trying secondary CDN...');
+          await Promise.race([
+            page.addScriptTag({
+              url: 'https://unpkg.com/axe-core@4.8.2/axe.min.js'
+            }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Secondary CDN timeout')), 8000))
+          ]);
+          console.log('✅ Axe-core loaded from secondary CDN');
+          return;
+          
+        } catch (secondaryCdnError) {
+          console.warn('📦 Secondary CDN failed:', secondaryCdnError);
+          
+          // Try to temporarily disable CSP and retry with timeout
+          try {
+            console.log('📦 Trying CSP bypass...');
+            await page.setBypassCSP(true);
+            await Promise.race([
+              page.addScriptTag({
+                url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
+              }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error('CSP bypass timeout')), 8000))
+            ]);
+            console.log('✅ Axe-core loaded with CSP bypass');
+            return;
+            
+          } catch (cspError) {
+            console.error('📦 CSP bypass also failed:', cspError);
+            throw new Error('All axe-core loading methods failed');
+          }
+        }
+      }
+    }
+  }
+
   static async runAccessibilityAudit(
     url: string,
     auditId: string,
@@ -37,9 +128,11 @@ export class AccessibilityService {
     // Run desktop and mobile accessibility audits SEQUENTIALLY (not parallel)
     console.log(`♿ Running desktop accessibility audit...`);
     const desktopResult = await this.runSingleAccessibilityAudit(url, auditId, host, 'desktop');
+    console.log(`✅ Desktop accessibility audit completed`);
     
     console.log(`♿ Running mobile accessibility audit...`);
     const mobileResult = await this.runSingleAccessibilityAudit(url, auditId, host, 'mobile');
+    console.log(`✅ Mobile accessibility audit completed`);
 
     // Combine results - take violations from both desktop and mobile (max 5 each = 10 total)
     const allViolations = [...desktopResult.violations, ...mobileResult.violations];
@@ -134,102 +227,91 @@ export class AccessibilityService {
         }
 
         // Inject axe-core from local package to bypass CSP restrictions
+        let axeInjectionSuccess = false;
         try {
-          // First try to load locally bundled axe-core
-          const axeCoreDir = path.resolve(process.cwd(), 'node_modules', 'axe-core');
-          let axeCoreScript: string;
+          console.log('🔧 Starting axe-core injection...');
           
-          try {
-            // Try to load from the main dist file
-            const axeCoreMainPath = path.join(axeCoreDir, 'axe.min.js');
-            if (fs.existsSync(axeCoreMainPath)) {
-              axeCoreScript = fs.readFileSync(axeCoreMainPath, 'utf8');
-            } else {
-              // Fallback to alternative path
-              const axeCoreAltPath = path.join(axeCoreDir, 'dist', 'axe.min.js');
-              axeCoreScript = fs.readFileSync(axeCoreAltPath, 'utf8');
-            }
-            
-            // Inject the script content directly
-            await page.addScriptTag({ content: axeCoreScript });
-            console.log('✅ Axe-core injected from local package');
-            
-          } catch (localError) {
-            console.warn('Failed to load axe-core from local package, trying CDN fallback...', localError);
-            
-            // First CDN fallback
-            try {
-              await page.addScriptTag({
-                url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
-              });
-              console.log('✅ Axe-core loaded from primary CDN');
-            } catch (primaryCdnError) {
-              console.warn('Primary CDN failed, trying secondary CDN...', primaryCdnError);
-              
-              // Second CDN fallback
-              try {
-                await page.addScriptTag({
-                  url: 'https://unpkg.com/axe-core@4.8.2/axe.min.js'
-                });
-                console.log('✅ Axe-core loaded from secondary CDN');
-              } catch (secondaryCdnError) {
-                console.warn('Secondary CDN failed, trying CSP bypass...', secondaryCdnError);
-                
-                // Try to temporarily disable CSP and retry
-                await page.setBypassCSP(true);
-                await page.addScriptTag({
-                  url: 'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.8.2/axe.min.js'
-                });
-                console.log('✅ Axe-core loaded with CSP bypass');
-              }
-            }
-          }
-        } catch (scriptError) {
-          console.error('❌ All axe-core loading methods failed:', scriptError);
-          const errorMessage = scriptError instanceof Error ? scriptError.message : 'Unknown error loading axe-core';
-          throw new Error(`Could not load axe-core script: ${errorMessage}`);
+          // Add timeout wrapper for the entire axe injection process
+          const axeInjectionPromise = this.injectAxeCore(page);
+          const axeTimeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Axe injection timeout after 15 seconds')), 15000)
+          );
+          
+          await Promise.race([axeInjectionPromise, axeTimeoutPromise]);
+          axeInjectionSuccess = true;
+          console.log('✅ Axe-core injection completed successfully');
+          
+        } catch (axeError) {
+          console.error('❌ Axe-core injection failed:', axeError);
+          // Continue without axe-core - we'll return empty violations
         }
 
-        // Run axe-core accessibility audit with timeout
-        let axeResults;
-        try {
-          axeResults = await Promise.race([
-            page.evaluate(() => {
-              return new Promise((resolve) => {
-                // Add safety check for axe
-                if (typeof (window as any).axe === 'undefined') {
-                  resolve({ violations: [] });
-                  return;
-                }
-                
-                // Run axe with reasonable timeout and standard config - only get violations
-                (window as any).axe.run({
-                  resultTypes: ['violations'] // Only get violations, skip passes to reduce processing
-                }, (err: any, results: any) => {
-                  if (err) {
-                    console.warn('Axe evaluation error:', err);
+        // Run axe-core accessibility audit with timeout only if injection succeeded
+        let axeResults: { violations: any[] } = { violations: [] };
+        if (axeInjectionSuccess) {
+          try {
+            console.log('🔍 Starting axe-core evaluation...');
+            
+            axeResults = await Promise.race([
+              page.evaluate(() => {
+                return new Promise((resolve) => {
+                  // Add safety check for axe
+                  if (typeof (window as any).axe === 'undefined') {
+                    console.warn('Axe not available in page context');
                     resolve({ violations: [] });
-                  } else {
-                    resolve(results);
+                    return;
                   }
+                  
+                  console.log('Running axe.run...');
+                  // Run axe with reasonable timeout and standard config - only get violations
+                  (window as any).axe.run({
+                    resultTypes: ['violations'] // Only get violations, skip passes to reduce processing
+                  }, (err: any, results: any) => {
+                    if (err) {
+                      console.warn('Axe evaluation error:', err);
+                      resolve({ violations: [] });
+                    } else {
+                      console.log('Axe evaluation completed with', results.violations?.length || 0, 'violations');
+                      resolve(results);
+                    }
+                  });
                 });
-              });
-            }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error('Axe evaluation timeout')), 20000) // 20 second timeout
-            )
-          ]);
-        } catch (axeError) {
-          console.warn(`⚠️ Axe evaluation failed for ${viewport}:`, axeError);
-          // If axe fails, continue without violations but still take screenshot
-          axeResults = { violations: [] };
+              }),
+              new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Axe evaluation timeout after 25 seconds')), 25000)
+              )
+            ]) as { violations: any[] };
+            
+            console.log('✅ Axe evaluation completed successfully');
+            
+          } catch (axeError) {
+            console.warn(`⚠️ Axe evaluation failed for ${viewport}:`, axeError);
+            // If axe fails, continue without violations but still take screenshot
+            axeResults = { violations: [] };
+          }
+        } else {
+          console.log('⚠️ Skipping axe evaluation due to injection failure');
         }
 
         const violations = (axeResults as any).violations || [];
         console.log(`♿ Found ${violations.length} ${viewport} violations`);
         
-        // Get element coordinates and violation indexes for annotations
-        const { elementCoordinates, violationIndexes } = await this.getElementCoordinates(page, violations);
+        // Get element coordinates and violation indexes for annotations with fallback
+        let elementCoordinates: Array<{x: number, y: number, width: number, height: number, impact: string}> = [];
+        let violationIndexes: number[] = [];
+        
+        try {
+          console.log('📍 Attempting coordinate extraction...');
+          const coordinateResult = await this.getElementCoordinates(page, violations);
+          elementCoordinates = coordinateResult.elementCoordinates;
+          violationIndexes = coordinateResult.violationIndexes;
+          console.log('✅ Coordinate extraction completed successfully');
+        } catch (coordinateError) {
+          console.warn(`⚠️ Coordinate extraction failed for ${viewport}, continuing without annotations:`, coordinateError);
+          // Continue without coordinates - the screenshot will be taken but not annotated
+          elementCoordinates = [];
+          violationIndexes = [];
+        }
         
         let annotatedScreenshotUrl: string | undefined;
 
@@ -279,12 +361,29 @@ export class AccessibilityService {
         // Filter out non-visual violations (same as used for annotations)
         const visualViolations = this.filterVisualViolations(violations);
 
-        // Format violations for storage - only the violations that were actually annotated (numbered 1-5)
-        // Use violationIndexes to get the exact violations that correspond to the annotations
-        const annotatedViolationIndexes = violationIndexes.slice(0, 5); // Only first 5 that were annotated
-        const formattedViolations = annotatedViolationIndexes.map((violationIndex: number) => {
-          const v = visualViolations[violationIndex];
-          return {
+        // Format violations for storage - handle case where coordinate extraction failed
+        let formattedViolations: any[] = [];
+        if (violationIndexes.length > 0) {
+          // Use violationIndexes to get the exact violations that correspond to the annotations
+          const annotatedViolationIndexes = violationIndexes.slice(0, 5); // Only first 5 that were annotated
+          formattedViolations = annotatedViolationIndexes.map((violationIndex: number) => {
+            const v = visualViolations[violationIndex];
+            return {
+              id: v.id,
+              impact: v.impact,
+              description: v.description,
+              help: v.help,
+              helpUrl: v.helpUrl,
+              nodes: v.nodes?.slice(0, 3).map((node: any) => ({
+                html: node.html?.substring(0, 200),
+                target: node.target,
+                failureSummary: node.failureSummary
+              })) || []
+            };
+          });
+        } else {
+          // Fallback: use first 5 visual violations if coordinate extraction failed
+          formattedViolations = visualViolations.slice(0, 5).map((v: any) => ({
             id: v.id,
             impact: v.impact,
             description: v.description,
@@ -295,20 +394,30 @@ export class AccessibilityService {
               target: node.target,
               failureSummary: node.failureSummary
             })) || []
-          };
-        });
+          }));
+        }
 
         // Close browser with timeout to prevent hanging on animated content
+        console.log(`🔒 Closing ${viewport} browser...`);
         try {
           await Promise.race([
             browser.close(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 10000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 5000)) // Reduced to 5 seconds
           ]);
+          console.log(`✅ ${viewport} browser closed successfully`);
         } catch (closeError) {
           console.warn(`⚠️ Browser close failed for ${viewport}, force killing:`, closeError);
-          try { browser.process()?.kill('SIGKILL'); } catch {}
+          try { 
+            if (browser.process()) {
+              browser.process()?.kill('SIGKILL'); 
+              console.log(`💀 ${viewport} browser process killed`);
+            }
+          } catch (killError) {
+            console.warn(`⚠️ Failed to kill ${viewport} browser process:`, killError);
+          }
         }
         
+        console.log(`📋 Preparing ${viewport} result with ${formattedViolations.length} violations`);
         const result: { violations: any[]; annotatedScreenshotUrl?: string } = {
           violations: formattedViolations
         };
@@ -317,6 +426,7 @@ export class AccessibilityService {
           result.annotatedScreenshotUrl = annotatedScreenshotUrl;
         }
         
+        console.log(`✅ ${viewport} audit completed, returning result`);
         return result;
         
       } catch (error) {
@@ -358,75 +468,140 @@ export class AccessibilityService {
   }> {
     console.log('📍 Getting element coordinates for', violations.length, 'violations');
     
-    // Scroll to top to ensure consistent coordinate system
-    await page.evaluate(() => {
-      window.scrollTo(0, 0);
-    });
+    // Early exit if no violations
+    if (violations.length === 0) {
+      console.log('📍 No violations to process, returning empty coordinates');
+      return {
+        elementCoordinates: [],
+        violationIndexes: []
+      };
+    }
     
-    // Wait for page to be stable using shared utility
-    await waitForPageReady(page, 500);
+    try {
+      // Scroll to top to ensure consistent coordinate system with timeout
+      console.log('📍 Scrolling to top...');
+      await Promise.race([
+        page.evaluate(() => {
+          window.scrollTo(0, 0);
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Scroll timeout')), 3000))
+      ]);
+      
+      // Wait for page to be stable using shared utility with timeout
+      console.log('📍 Waiting for page ready...');
+      const waitPromise = waitForPageReady(page, 500);
+      const waitTimeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Page ready timeout')), 5000)
+      );
+      
+      try {
+        await Promise.race([waitPromise, waitTimeoutPromise]);
+      } catch (error) {
+        console.log('⚠️ Page ready wait timed out, continuing...');
+      }
 
-    // Wait additional 3 seconds for page to fully load
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Filter out non-visual violations
-    const visualViolations = this.filterVisualViolations(violations);
-    
-    console.log('📍 Visual violations to process:', visualViolations.length);
-    
-    const result = await page.evaluate((violations: any[]) => {
-      const coords: Array<{x: number, y: number, width: number, height: number, impact: string}> = [];
-      const violationIndexes: number[] = [];
-      const viewportWidth = window.innerWidth;
-      const viewportHeight = window.innerHeight;
-      let elementsOutsideViewport = 0;
+      // Reduced wait time for page to fully load
+      console.log('📍 Final page load wait...');
+      await new Promise(resolve => setTimeout(resolve, 1500));
       
-      violations.forEach((violation: any, violationIndex: number) => {
-        violation.nodes.forEach((node: any) => {
-          try {
-            const selectors = Array.isArray(node.target) ? node.target : [node.target];
-            selectors.forEach((selector: string) => {
-              if (typeof selector === 'string') {
-                try {
-                  const elements = document.querySelectorAll(selector);
-                  elements.forEach((element: Element) => {
-                    const rect = element.getBoundingClientRect();
-                    if (rect.width > 0 && rect.height > 0) {
-                      const centerX = rect.left + rect.width / 2;
-                      const centerY = rect.top + rect.height / 2;
+      // Filter out non-visual violations
+      const visualViolations = this.filterVisualViolations(violations);
+      
+      console.log('📍 Visual violations to process:', visualViolations.length);
+      
+      // Coordinate extraction with aggressive timeout and limits
+      console.log('📍 Extracting coordinates...');
+      const result = await Promise.race([
+        page.evaluate((violations: any[]) => {
+          console.log('📍 Starting coordinate extraction in browser...');
+          const coords: Array<{x: number, y: number, width: number, height: number, impact: string}> = [];
+          const violationIndexes: number[] = [];
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          let processedElements = 0;
+          const maxProcessingTime = Date.now() + 6000; // 6 second internal timeout
+          
+          // Process only first 5 violations to prevent hanging
+          const limitedViolations = violations.slice(0, 5);
+          
+          for (let violationIndex = 0; violationIndex < limitedViolations.length; violationIndex++) {
+            // Check internal timeout frequently
+            if (Date.now() > maxProcessingTime) {
+              console.log('📍 Internal timeout reached, stopping coordinate extraction');
+              break;
+            }
+            
+            const violation = limitedViolations[violationIndex];
+            
+            // Stop after 5 coordinates to prevent hanging
+            if (coords.length >= 5) break;
+
+            // Process only first 2 nodes to reduce complexity
+            const limitedNodes = violation.nodes?.slice(0, 2) || [];
+            
+            for (const node of limitedNodes) {
+              // Check timeout again
+              if (Date.now() > maxProcessingTime || coords.length >= 5) break;
+              
+              try {
+                const selectors = Array.isArray(node.target) ? node.target : [node.target];
+                
+                // Process only the first selector to reduce complexity
+                const firstSelector = selectors[0];
+                if (typeof firstSelector === 'string') {
+                  try {
+                    const elements = document.querySelectorAll(firstSelector);
+                    // Process only the first 2 elements found
+                    const limitedElements = Array.from(elements).slice(0, 2);
+                    
+                    for (const element of limitedElements) {
+                      if (Date.now() > maxProcessingTime || coords.length >= 5) break;
                       
-                      // Check if element is outside viewport
-                      if (centerX < 0 || centerX > viewportWidth || centerY < 0 || centerY > viewportHeight) {
-                        elementsOutsideViewport++;
+                      processedElements++;
+                      const rect = element.getBoundingClientRect();
+                      if (rect.width > 0 && rect.height > 0) {
+                        const centerX = rect.left + rect.width / 2;
+                        const centerY = rect.top + rect.height / 2;
+                        
+                        coords.push({
+                          x: centerX,
+                          y: centerY,
+                          width: rect.width,
+                          height: rect.height,
+                          impact: violation.impact
+                        });
+                        violationIndexes.push(violationIndex);
                       }
-                      
-                      coords.push({
-                        x: centerX,
-                        y: centerY,
-                        width: rect.width,
-                        height: rect.height,
-                        impact: violation.impact
-                      });
-                      violationIndexes.push(violationIndex);
                     }
-                  });
-                } catch (selectorError) {
-                  console.warn('Invalid selector:', selector);
+                  } catch (selectorError) {
+                    console.warn('Invalid selector:', firstSelector);
+                  }
                 }
+              } catch (error) {
+                console.warn('Error getting coordinates for node');
               }
-            });
-          } catch (error) {
-            console.warn('Error getting coordinates for node');
+            }
           }
-        });
-      });
+          
+          console.log(`📍 Coordinate extraction complete. Viewport: ${viewportWidth}x${viewportHeight}, Coords found: ${coords.length}, Processed: ${processedElements}`);
+          return { elementCoordinates: coords, violationIndexes };
+        }, visualViolations),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Coordinate extraction timeout after 8 seconds')), 8000)
+        )
+      ]);
       
-      console.log(`📍 Viewport: ${viewportWidth}x${viewportHeight}, Elements outside viewport: ${elementsOutsideViewport}/${coords.length}`);
-      return { elementCoordinates: coords, violationIndexes };
-    }, visualViolations);
-    
-    console.log('📍 Got coordinates for', result.elementCoordinates.length, 'elements');
-    return result;
+      console.log('📍 Got coordinates for', result.elementCoordinates.length, 'elements');
+      return result;
+      
+    } catch (error) {
+      console.error('❌ Error getting element coordinates:', error);
+      // Return empty coordinates on failure rather than crashing
+      return {
+        elementCoordinates: [],
+        violationIndexes: []
+      };
+    }
   }
 
   private static async annotateScreenshot(

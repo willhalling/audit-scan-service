@@ -91,7 +91,7 @@ export async function blockAggressiveMapResources(page: any): Promise<void> {
 }
 
 /**
- * Hide specified elements on the page
+ * Hide elements that commonly interfere with screenshots
  * @param page Puppeteer page instance
  * @param additionalSelectors Optional additional selectors to hide
  */
@@ -104,30 +104,46 @@ export async function hideElementsForScreenshot(
   // Wait for late-loading elements like cookie banners to appear
   await new Promise(resolve => setTimeout(resolve, 1500));
   
-  await page.evaluate((selectors: string[]) => {
-    console.log(`🙈 Attempting to hide ${selectors.length} element types`);
-    let hiddenCount = 0;
+  try {
+    console.log(`🙈 Hiding elements for screenshot...`);
     
-    selectors.forEach((selector: string) => {
-      try {
-        const elements = document.querySelectorAll(selector);
-        elements.forEach((el: Element) => {
-          if (el && el instanceof HTMLElement) {
-            // Check if element is visible before hiding
-            const computedStyle = window.getComputedStyle(el);
-            if (computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden') {
-              el.style.display = 'none';
-              hiddenCount++;
-            }
+    // Add timeout wrapper to prevent hanging
+    await Promise.race([
+      page.evaluate((selectors: string[]) => {
+        console.log(`🙈 Attempting to hide ${selectors.length} element types`);
+        let hiddenCount = 0;
+        
+        selectors.forEach((selector: string) => {
+          try {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach((el: Element) => {
+              if (el && el instanceof HTMLElement) {
+                // Check if element is visible before hiding
+                const computedStyle = window.getComputedStyle(el);
+                if (computedStyle.display !== 'none' && computedStyle.visibility !== 'hidden') {
+                  el.style.display = 'none';
+                  hiddenCount++;
+                }
+              }
+            });
+          } catch (error) {
+            console.warn(`Failed to hide elements with selector: ${selector}`, error);
           }
         });
-      } catch (error) {
-        console.warn(`Failed to hide elements with selector: ${selector}`, error);
-      }
-    });
+        
+        console.log(`✅ Hidden ${hiddenCount} elements for screenshot`);
+      }, allSelectors),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Hide elements timeout after 8 seconds')), 8000)
+      )
+    ]);
     
-    console.log(`✅ Hidden ${hiddenCount} elements for screenshot`);
-  }, allSelectors);
+    console.log(`✅ Element hiding completed successfully`);
+    
+  } catch (error) {
+    console.warn(`⚠️ Element hiding failed or timed out:`, error);
+    // Continue without hiding elements - better to get a screenshot with elements than hang
+  }
 }
 
 /**
@@ -139,24 +155,9 @@ export async function waitForPageReady(
   page: any, 
   additionalWaitTime: number = 2000
 ): Promise<void> {
-  // Wait for any animations or dynamic content to settle
+  // Simple wait for any animations or dynamic content to settle
+  // Removed page.waitForFunction() as it can hang indefinitely
+  console.log(`⏱️ Waiting ${additionalWaitTime}ms for page to be ready...`);
   await new Promise(resolve => setTimeout(resolve, additionalWaitTime));
-  
-  // Optionally wait for specific conditions
-  try {
-    await page.waitForFunction(
-      () => {
-        // Check if page is done loading and animating
-        return document.readyState === 'complete' && 
-               !document.querySelector('.loading') &&
-               !document.querySelector('.spinner');
-      },
-      { timeout: 5000 }
-    ).catch(() => {
-      // Ignore timeout, continue with screenshot
-      console.log('⏱️ Page ready check timed out, proceeding with screenshot');
-    });
-  } catch (error) {
-    console.log('⏱️ Page ready check failed, proceeding with screenshot');
-  }
+  console.log(`✅ Page ready wait completed`);
 }

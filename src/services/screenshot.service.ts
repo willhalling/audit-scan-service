@@ -58,17 +58,59 @@ export class ScreenshotService {
 
       // Hide elements before screenshot
       await hideElementsForScreenshot(page, options.hideSelectors);
-      await waitForPageReady(page);
+      
+      // Add timeout to waitForPageReady to prevent hanging
+      console.log(`⏱️ Waiting for page to be ready...`);
+      const waitPromise = waitForPageReady(page, 1000); // Reduced wait time
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('waitForPageReady timeout')), 8000)
+      );
+      
+      try {
+        await Promise.race([waitPromise, timeoutPromise]);
+      } catch (error) {
+        console.log(`⚠️ Page ready wait timed out, proceeding with screenshot: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
 
       console.log(`📸 Taking normal screenshot...`);
-      const screenshot = await page.screenshot({
+      
+      // Add much more aggressive timeout to screenshot operation
+      console.log(`📸 Starting screenshot capture with 10 second timeout...`);
+      const screenshotPromise = page.screenshot({
         fullPage: options.fullPage || false,
         type: 'png'
       });
+      const screenshotTimeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => {
+          console.error('📸 SCREENSHOT TIMEOUT - Screenshot operation hanging after 10 seconds');
+          reject(new Error('Screenshot timeout after 10 seconds'));
+        }, 10000) // Reduced from 15 to 10 seconds
+      );
+      
+      console.log(`📸 Racing screenshot vs timeout...`);
+      const screenshot = await Promise.race([screenshotPromise, screenshotTimeoutPromise]);
+      console.log(`📸 Screenshot completed successfully`);
 
       return screenshot as Buffer;
     } finally {
-      await browser.close();
+      console.log(`🔒 Closing screenshot browser...`);
+      try {
+        await Promise.race([
+          browser.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 5000))
+        ]);
+        console.log(`✅ Screenshot browser closed successfully`);
+      } catch (closeError) {
+        console.warn(`⚠️ Screenshot browser close failed, force killing:`, closeError);
+        try {
+          if (browser.process()) {
+            browser.process()?.kill('SIGKILL');
+            console.log(`💀 Screenshot browser process killed`);
+          }
+        } catch (killError) {
+          console.warn(`⚠️ Failed to kill screenshot browser process:`, killError);
+        }
+      }
     }
   }
 
@@ -109,20 +151,49 @@ export class ScreenshotService {
       ];
       
       // Shorter wait for aggressive mode
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Reduced from 2000
 
       await hideElementsForScreenshot(page, [...(options.hideSelectors || []), ...mapSelectors]);
       
-
       console.log(`📸 Taking aggressive screenshot...`);
-      const screenshot = await page.screenshot({
+      
+      // Add timeout to aggressive screenshot with better logging
+      console.log(`📸 Starting aggressive screenshot capture with 10 second timeout...`);
+      const screenshotPromise = page.screenshot({
         fullPage: options.fullPage || false,
         type: 'png'
       });
+      const screenshotTimeoutPromise = new Promise<never>((_, reject) => 
+        setTimeout(() => {
+          console.error('📸 AGGRESSIVE SCREENSHOT TIMEOUT - Screenshot operation hanging after 10 seconds');
+          reject(new Error('Aggressive screenshot timeout after 10 seconds'));
+        }, 10000) // Reduced from 12 to 10 seconds
+      );
+      
+      console.log(`📸 Racing aggressive screenshot vs timeout...`);
+      const screenshot = await Promise.race([screenshotPromise, screenshotTimeoutPromise]);
+      console.log(`📸 Aggressive screenshot completed successfully`);
 
       return screenshot as Buffer;
     } finally {
-      await browser.close();
+      console.log(`🔒 Closing aggressive screenshot browser...`);
+      try {
+        await Promise.race([
+          browser.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Browser close timeout')), 5000))
+        ]);
+        console.log(`✅ Aggressive screenshot browser closed successfully`);
+      } catch (closeError) {
+        console.warn(`⚠️ Aggressive screenshot browser close failed, force killing:`, closeError);
+        try {
+          if (browser.process()) {
+            browser.process()?.kill('SIGKILL');
+            console.log(`💀 Aggressive screenshot browser process killed`);
+          }
+        } catch (killError) {
+          console.warn(`⚠️ Failed to kill aggressive screenshot browser process:`, killError);
+        }
+      }
     }
   }
 
