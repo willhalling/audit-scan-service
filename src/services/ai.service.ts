@@ -109,7 +109,7 @@ Provide analysis and suggestions in this exact JSON structure:
 IMPORTANT: For suggestions, provide the actual improved text/content directly, not explanatory text. 
 - For meta title suggestion: provide the actual improved title text (single line, max 60 characters)
 - For meta description suggestion: provide the actual improved description text (single line, max 160 characters)
-- For tone/readability/intent suggestions: provide detailed, comprehensive single-line actionable text improvements
+- For tone/readability/intent suggestions: provide general guidance on how to improve rather than specific text changes (single line)
 
 FORMATTING RULES:
 - All suggestions must be single line text only
@@ -134,15 +134,15 @@ FORMATTING RULES:
       content: {
         tone: {
           analysis: "Content tone is professional and informative",
-          suggestions: "Adopt a more conversational and personal tone that speaks directly to customer pain points and builds emotional connection"
+          suggestions: "Use more conversational language that directly addresses customer pain points"
         },
         readability: {
           analysis: "Content is generally readable but could be improved",
-          suggestions: "Break up long paragraphs into shorter sentences and use simpler language to improve comprehension and engagement"
+          suggestions: "Simplify language and break up long paragraphs for better comprehension"
         },
         intent: {
           analysis: "Content aligns well with likely user intent",
-          suggestions: "Address specific user concerns and provide clear next steps that guide visitors toward taking action"
+          suggestions: "Address specific user concerns and provide clearer next steps"
         }
       }
     };
