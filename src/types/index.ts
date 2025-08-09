@@ -333,6 +333,7 @@ export interface PageData {
     suggestion: string;
     severity: 'critical' | 'serious' | 'moderate' | 'minor';
   }>;
+  mozData?: MozAnalysisResult;
   lighthouseDesktop?: ReducedLighthouseData;
   lighthouseMobile?: ReducedLighthouseData;
   accessibilityDesktop?: { violations: ReducedAccessibilityViolation[] };
@@ -381,6 +382,50 @@ export interface ReducedLighthouseData {
     suggestion: string;
     severity: 'critical' | 'serious' | 'moderate' | 'minor';
   }>;
+}
+
+export interface MozMetrics {
+  url: string;
+  domainAuthority: number;
+  pageAuthority: number;
+  spamScore: number;
+  linkingDomains: number;
+  totalLinks: number;
+  mozRank: number;
+  mozTrust: number;
+  lastCrawled?: string | undefined;
+  title?: string | undefined;
+  error?: string;
+}
+
+export interface MozKeywordData {
+  keyword: string;
+  difficulty: number;
+  volume: number;
+  opportunity: number;
+  potential: number;
+  ctr: number;
+  priority: number;
+}
+
+export interface MozCompetitorData {
+  url: string;
+  domainAuthority: number;
+  pageAuthority: number;
+  linkingDomains: number;
+  totalLinks: number;
+  commonKeywords?: number;
+  competitionLevel?: 'low' | 'medium' | 'high';
+}
+
+export interface MozAnalysisResult {
+  url: string;
+  metrics: MozMetrics;
+  keywords?: MozKeywordData[];
+  competitors?: MozCompetitorData[];
+  timestamp: string;
+  rateLimitRemaining?: number | undefined;
+  error?: string;
 }
 
 export interface QuestionItem {

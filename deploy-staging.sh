@@ -33,9 +33,11 @@ if [ -f .env ]; then
   # Read the entire line and extract everything after the first =
   FIREBASE_SERVICE_ACCOUNT=$(grep "^FIREBASE_SERVICE_ACCOUNT=" .env | sed 's/^FIREBASE_SERVICE_ACCOUNT=//')
   OPENAI_API_KEY=$(grep "^OPENAI_API_KEY=" .env | sed 's/^OPENAI_API_KEY=//' | sed "s/^'//" | sed "s/'$//")
+  MOZ_API_TOKEN=$(grep "^MOZ_API_TOKEN=" .env | sed 's/^MOZ_API_TOKEN=//' | sed "s/^'//" | sed "s/'$//")
+  MOZ_ENABLED=$(grep "^MOZ_ENABLED=" .env | sed 's/^MOZ_ENABLED=//' | sed "s/^'//" | sed "s/'$//")
 else
   echo "❌ ERROR: .env file not found!"
-  echo "Please create a .env file with FIREBASE_SERVICE_ACCOUNT and OPENAI_API_KEY variables"
+  echo "Please create a .env file with FIREBASE_SERVICE_ACCOUNT, OPENAI_API_KEY, and MOZ environment variables"
   exit 1
 fi
 
@@ -53,14 +55,30 @@ if [ -z "$OPENAI_API_KEY" ]; then
   exit 1
 fi
 
+# Check if MOZ API Token was loaded
+if [ -z "$MOZ_API_TOKEN" ]; then
+  echo "❌ ERROR: MOZ_API_TOKEN not found in .env file!"
+  echo "Please add MOZ_API_TOKEN='your-moz-api-token' to your .env file"
+  exit 1
+fi
+
+if [ -z "$MOZ_ENABLED" ]; then
+  echo "❌ ERROR: MOZ_ENABLED not found in .env file!"
+  echo "Please add MOZ_ENABLED='true' to your .env file"
+  exit 1
+fi
+
 echo "✅ Firebase service account loaded from .env file (${#FIREBASE_SERVICE_ACCOUNT} characters)"
 echo "✅ OpenAI API key loaded from .env file (${#OPENAI_API_KEY} characters)"
+echo "✅ MOZ API Token loaded from .env file (${#MOZ_API_TOKEN} characters, Enabled: $MOZ_ENABLED)"
 
 # Create env vars file to avoid shell escaping issues - staging environment
 cat > /tmp/env-vars-staging.yaml << EOF
 NODE_ENV: staging
 PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome-stable
 OPENAI_API_KEY: ${OPENAI_API_KEY}
+MOZ_API_TOKEN: ${MOZ_API_TOKEN}
+MOZ_ENABLED: "${MOZ_ENABLED}"
 FIREBASE_SERVICE_ACCOUNT: |
   ${FIREBASE_SERVICE_ACCOUNT}
 EOF
