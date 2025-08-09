@@ -177,8 +177,8 @@ Provide analysis and suggestions in this exact JSON structure:
 }
 
 IMPORTANT: For suggestions, provide the actual improved text/content directly, not explanatory text.
-- For meta title suggestion: provide the actual improved title text incorporating the AI-generated keywords naturally (single line, max 60 characters)
-- For meta description suggestion: provide the actual improved description text incorporating the AI-generated keywords naturally (single line, max 160 characters)
+- For meta title suggestion: provide the actual improved title text incorporating one AI-generated keyword naturally (single line, max 60 characters)
+- For meta description suggestion: provide the actual improved description text incorporating one AI-generated keyword naturally (single line, max 160 characters)
 - For tone/readability/intent suggestions: provide general guidance on how to improve rather than specific text changes (single line)
 
 FORMATTING RULES:
