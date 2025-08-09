@@ -1,53 +1,53 @@
-import axios from 'axios';
 import { MozMetrics, MozKeywordData, MozCompetitorData, MozAnalysisResult } from '../types/index.js';
 
 export interface MozApiResponse {
-  results?: Array<{
-    url: string;
-    domain_authority?: number;
-    page_authority?: number;
-    spam_score?: number;
-    linking_domains?: number;
-    external_links?: number;
-    mozrank_url?: number;
-    moztrust_url?: number;
-    last_crawled?: string;
-    title?: string;
-  }>;
+  result?: {
+    site_metrics?: {
+      page: string;
+      title?: string;
+      domain_authority?: number;
+      page_authority?: number;
+      spam_score?: number;
+      root_domains_to_page?: number;
+      external_pages_to_page?: number;
+      last_crawled?: string;
+      pages_to_page?: number;
+      pages_to_subdomain?: number;
+      pages_to_root_domain?: number;
+    };
+  };
   error?: {
+    code: number;
     message: string;
-    status: number;
   };
 }
 
 export interface MozKeywordApiResponse {
-  results?: Array<{
-    keyword: string;
-    difficulty?: number;
-    volume?: number;
-    opportunity?: number;
-    potential?: number;
-    ctr?: number;
-    priority?: number;
-  }>;
+  result?: {
+    suggestions?: Array<{
+      keyword: string;
+      relevance?: number;
+    }>;
+  };
   error?: {
+    code: number;
     message: string;
-    status: number;
   };
 }
 
 export interface MozCompetitorApiResponse {
-  results?: Array<{
-    url: string;
-    domain_authority?: number;
-    page_authority?: number;
-    linking_domains?: number;
-    external_links?: number;
-    common_keywords?: number;
-  }>;
+  result?: {
+    ranking_keywords?: Array<{
+      keyword: string;
+      ranking_page?: string;
+      rank_position?: number;
+      difficulty?: number;
+      volume?: number;
+    }>;
+  };
   error?: {
+    code: number;
     message: string;
-    status: number;
   };
 }
 
@@ -58,7 +58,7 @@ export interface MozRateLimitInfo {
 }
 
 export class MozService {
-  private static readonly BASE_URL = 'https://lsapi.seomoz.com/v2';
+  private static readonly BASE_URL = 'https://api.moz.com';
   private static readonly TIMEOUT = 30000; // 30 seconds
   private static readonly DEFAULT_RATE_LIMIT_DELAY = 1000; // 1 second between requests
   private static lastRequestTime = 0;
@@ -120,9 +120,9 @@ export class MozService {
   }
 
   /**
-   * Make authenticated request to MOZ API
+   * Make authenticated request to MOZ JSON-RPC API
    */
-  private static async makeRequest(endpoint: string, data: Record<string, unknown>): Promise<{ data: MozApiResponse | MozKeywordApiResponse | MozCompetitorApiResponse; rateLimitInfo?: MozRateLimitInfo | null }> {
+  private static async makeRequest(method: string, params: Record<string, unknown>): Promise<{ data: MozApiResponse | MozKeywordApiResponse | MozCompetitorApiResponse; rateLimitInfo?: MozRateLimitInfo | null }> {
     try {
       if (!this.isEnabled()) {
         throw new Error('MOZ API is disabled. Set MOZ_ENABLED=true to enable.');
@@ -131,31 +131,48 @@ export class MozService {
       await this.applyRateLimit();
 
       const credentials = this.getCredentials();
-      const authHeader = `Basic ${credentials.apiToken}`;
       console.log('🔑 Using MOZ API Token authentication');
 
-      const response = await axios.post(`${this.BASE_URL}${endpoint}`, data, {
+      const requestPayload = {
+        jsonrpc: "2.0",
+        id: `audit-scan-service-${method.replace(/\./g, '-')}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        method: method,
+        params: {
+          data: params
+        }
+      };
+
+      const response = await fetch(`${this.BASE_URL}/jsonrpc`, {
+        method: 'POST',
         headers: {
-          'Authorization': authHeader,
+          'x-moz-token': credentials.apiToken,
           'Content-Type': 'application/json',
           'User-Agent': 'AuditScanService/1.0'
         },
-        timeout: this.TIMEOUT
+        body: JSON.stringify(requestPayload)
       });
 
-      // Parse rate limit info
-      const rateLimitInfo = this.parseRateLimitHeaders(response.headers as Record<string, unknown>);
+      if (!response.ok) {
+        throw new Error(`MOZ API HTTP error: ${response.status} - ${response.statusText}`);
+      }
+
+      const responseData = await response.json();
+
+      // Parse rate limit info from headers
+      const rateLimitInfo = this.parseRateLimitHeaders(Object.fromEntries(response.headers.entries()));
       if (rateLimitInfo) {
         this.rateLimitInfo = rateLimitInfo;
         console.log(`📊 Rate limit: ${rateLimitInfo.remaining}/${rateLimitInfo.total} remaining`);
       }
 
-      return { data: response.data, rateLimitInfo };
+      // Check for JSON-RPC error
+      if (responseData.error) {
+        throw new Error(`MOZ API Error: ${responseData.error.code} - ${responseData.error.message}`);
+      }
+
+      return { data: responseData, rateLimitInfo };
     } catch (error) {
       console.error('MOZ API request failed:', error);
-      if (axios.isAxiosError(error)) {
-        throw new Error(`MOZ API Error: ${error.response?.status} - ${error.response?.statusText}`);
-      }
       throw error;
     }
   }
@@ -172,46 +189,39 @@ export class MozService {
         throw new Error('Valid URL is required');
       }
 
-      // Ensure URL has protocol
+      // Ensure URL has protocol and normalize
       const normalizedUrl = url.startsWith('http') ? url : `https://${url}`;
+      const domain = normalizedUrl.replace(/^https?:\/\//, '').split('/')[0];
 
-      const requestData = {
-        targets: [normalizedUrl],
-        metrics: [
-          'domain_authority',
-          'page_authority', 
-          'spam_score',
-          'linking_domains',
-          'external_links',
-          'mozrank_url',
-          'moztrust_url',
-          'last_crawled',
-          'title'
-        ]
+      const params = {
+        site_query: {
+          query: domain,
+          scope: "domain"
+        }
       };
 
-      const response = await this.makeRequest('/url_metrics', requestData);
+      const response = await this.makeRequest('data.site.metrics.fetch', params);
       const apiResponse = response.data as MozApiResponse;
 
       if (apiResponse.error) {
         throw new Error(`MOZ API Error: ${apiResponse.error.message}`);
       }
 
-      if (!apiResponse.results || apiResponse.results.length === 0) {
+      if (!apiResponse.result?.site_metrics) {
         throw new Error('No metrics data returned from MOZ API');
       }
 
-      const result = apiResponse.results[0];
+      const result = apiResponse.result.site_metrics;
 
       return {
         url: normalizedUrl,
         domainAuthority: result.domain_authority || 0,
         pageAuthority: result.page_authority || 0,
         spamScore: result.spam_score || 0,
-        linkingDomains: result.linking_domains || 0,
-        totalLinks: result.external_links || 0,
-        mozRank: result.mozrank_url || 0,
-        mozTrust: result.moztrust_url || 0,
+        linkingDomains: result.root_domains_to_page || 0,
+        totalLinks: result.external_pages_to_page || 0,
+        mozRank: 0, // Not available in new API
+        mozTrust: 0, // Not available in new API
         lastCrawled: result.last_crawled,
         title: result.title
       };
@@ -234,7 +244,7 @@ export class MozService {
   }
 
   /**
-   * Get metrics for multiple URLs (batch processing)
+   * Get metrics for multiple URLs (sequential processing since new API is single-site only)
    */
   static async getBulkUrlMetrics(urls: string[]): Promise<MozMetrics[]> {
     console.log(`🔍 Getting MOZ metrics for ${urls.length} URLs`);
@@ -243,64 +253,25 @@ export class MozService {
       return [];
     }
 
-    // MOZ API typically has a limit on batch requests (usually 100)
-    const BATCH_SIZE = 50;
     const results: MozMetrics[] = [];
 
-    for (let i = 0; i < urls.length; i += BATCH_SIZE) {
-      const batch = urls.slice(i, i + BATCH_SIZE);
-      
+    // Process URLs sequentially to respect rate limits and API constraints
+    for (let i = 0; i < urls.length; i++) {
       try {
-        const normalizedUrls = batch.map(url => 
-          url.startsWith('http') ? url : `https://${url}`
-        );
+        const result = await this.getUrlMetrics(urls[i]);
+        results.push(result);
 
-        const requestData = {
-          targets: normalizedUrls,
-          metrics: [
-            'domain_authority',
-            'page_authority',
-            'spam_score', 
-            'linking_domains',
-            'external_links',
-            'mozrank_url',
-            'moztrust_url',
-            'last_crawled',
-            'title'
-          ]
-        };
-
-        const response = await this.makeRequest('/url_metrics', requestData);
-        const apiResponse = response.data as MozApiResponse;
-
-        if (apiResponse.results) {
-          const batchResults = apiResponse.results.map((result, index) => ({
-            url: normalizedUrls[index],
-            domainAuthority: result.domain_authority || 0,
-            pageAuthority: result.page_authority || 0,
-            spamScore: result.spam_score || 0,
-            linkingDomains: result.linking_domains || 0,
-            totalLinks: result.external_links || 0,
-            mozRank: result.mozrank_url || 0,
-            mozTrust: result.moztrust_url || 0,
-            lastCrawled: result.last_crawled,
-            title: result.title
-          }));
-
-          results.push(...batchResults);
-        }
-
-        // Add delay between batches to respect rate limits
-        if (i + BATCH_SIZE < urls.length) {
+        // Add delay between requests to respect rate limits
+        if (i < urls.length - 1) {
           await new Promise(resolve => setTimeout(resolve, 1000));
         }
 
       } catch (error) {
-        console.error(`❌ Batch MOZ request failed for batch starting at index ${i}:`, error);
+        console.error(`❌ MOZ request failed for URL ${urls[i]}:`, error);
         
-        // Add error entries for failed batch
-        const errorResults = batch.map(url => ({
-          url,
+        // Add error entry for failed request
+        results.push({
+          url: urls[i],
           domainAuthority: 0,
           pageAuthority: 0,
           spamScore: 0,
@@ -308,10 +279,8 @@ export class MozService {
           totalLinks: 0,
           mozRank: 0,
           mozTrust: 0,
-          error: error instanceof Error ? error.message : 'Batch request failed'
-        }));
-
-        results.push(...errorResults);
+          error: error instanceof Error ? error.message : 'Request failed'
+        });
       }
     }
 
@@ -327,7 +296,7 @@ export class MozService {
   }
 
   /**
-   * Get keyword data for a domain
+   * Get keyword data for a domain - supports both ranking keywords and keyword suggestions
    */
   static async getKeywordData(domain: string, keywords?: string[]): Promise<MozKeywordData[]> {
     console.log(`🔍 Getting MOZ keyword data for: ${domain}`);
@@ -345,38 +314,116 @@ export class MozService {
       // Normalize domain
       const normalizedDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      const requestData = {
-        targets: [normalizedDomain],
-        keywords: keywords || [], // Use provided keywords or let MOZ discover them
-        limit: 50 // Limit to avoid excessive API usage
+      // If specific keywords are provided, get suggestions for those keywords
+      if (keywords && keywords.length > 0) {
+        console.log(`🔍 Getting keyword suggestions for ${keywords.length} provided keywords`);
+        return await this.getKeywordSuggestions(keywords);
+      }
+
+      // Otherwise, get ranking keywords for the domain (default behavior)
+      console.log(`🔍 Getting ranking keywords for domain: ${normalizedDomain}`);
+      const params = {
+        target_query: {
+          query: normalizedDomain,
+          scope: "domain",
+          locale: "en-US"
+        },
+        page: {
+          n: 0,
+          limit: 20
+        },
+        options: {
+          sort: "rank"
+        }
       };
 
-      const response = await this.makeRequest('/keyword_suggestions', requestData);
-      const apiResponse = response.data as MozKeywordApiResponse;
+      const response = await this.makeRequest('data.site.ranking-keyword.list', params);
+      const apiResponse = response.data as MozCompetitorApiResponse;
 
       if (apiResponse.error) {
         throw new Error(`MOZ Keyword API Error: ${apiResponse.error.message}`);
       }
 
-      if (!apiResponse.results || apiResponse.results.length === 0) {
-        console.log('No keyword data returned from MOZ API');
+      if (!apiResponse.result?.ranking_keywords || apiResponse.result.ranking_keywords.length === 0) {
+        console.log('No ranking keyword data returned from MOZ API');
         return [];
       }
 
-      return apiResponse.results.map(result => ({
+      return apiResponse.result.ranking_keywords.map(result => ({
         keyword: result.keyword,
         difficulty: result.difficulty || 0,
-        volume: result.volume || 0,
-        opportunity: result.opportunity || 0,
-        potential: result.potential || 0,
-        ctr: result.ctr || 0,
-        priority: result.priority || 0
+        volume: Math.round((result.volume || 0) * 100) / 100, // Round volume to 2 decimal places
+        opportunity: 0,
+        potential: 0,
+        ctr: 0,
+        priority: 0,
+        relevance: 100 - (result.rank_position || 50) // Higher relevance for better rankings
       }));
 
     } catch (error) {
       console.error(`❌ MOZ keyword research failed for ${domain}:`, error);
       return [];
     }
+  }
+
+  /**
+   * Get keyword suggestions for specific keywords using universal strategy
+   */
+  static async getKeywordSuggestions(keywords: string[]): Promise<MozKeywordData[]> {
+    const allSuggestions: MozKeywordData[] = [];
+
+    for (const keyword of keywords) {
+      try {
+        const params = {
+          serp_query: {
+            keyword: keyword,
+            locale: "en-US",
+            device: "desktop",
+            engine: "google"
+          },
+          page: {
+            n: 0,
+            limit: 10
+          },
+          options: {
+            strategy: "universal" // Use universal strategy as suggested by API
+          }
+        };
+
+        const response = await this.makeRequest('data.keyword.suggestions.list', params);
+        const apiResponse = response.data as MozKeywordApiResponse;
+
+        if (apiResponse.error) {
+          console.warn(`⚠️  Keyword suggestions failed for "${keyword}": ${apiResponse.error.message}`);
+          continue; // Skip this keyword and continue with others
+        }
+
+        if (apiResponse.result?.suggestions && apiResponse.result.suggestions.length > 0) {
+          const suggestions = apiResponse.result.suggestions.map(result => ({
+            keyword: result.keyword,
+            difficulty: 0, // Not available in suggestions endpoint
+            volume: 0, // Not available in suggestions endpoint
+            opportunity: 0,
+            potential: 0,
+            ctr: 0,
+            priority: 0,
+            relevance: Math.round((result.relevance || 0) * 100) / 100 // Round to 2 decimal places
+          }));
+
+          allSuggestions.push(...suggestions);
+        }
+
+        // Rate limiting between keyword requests
+        if (keywords.indexOf(keyword) < keywords.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+      } catch (error) {
+        console.warn(`⚠️  Failed to get suggestions for keyword "${keyword}":`, error);
+      }
+    }
+
+    return allSuggestions;
   }
 
   /**
@@ -398,50 +445,71 @@ export class MozService {
       // Normalize domain
       const normalizedDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      const requestData = {
-        targets: [normalizedDomain],
-        limit: Math.min(limit, 50), // Cap at 50 to avoid excessive usage
-        metrics: [
-          'domain_authority',
-          'page_authority',
-          'linking_domains',
-          'external_links',
-          'common_keywords'
-        ]
+      const params = {
+        target_query: {
+          query: normalizedDomain,
+          scope: "domain",
+          locale: "en-US"
+        },
+        page: {
+          n: 0,
+          limit: Math.min(limit, 50)
+        },
+        options: {
+          sort: "rank"
+        }
       };
 
-      const response = await this.makeRequest('/competitor_analysis', requestData);
+      const response = await this.makeRequest('data.site.ranking-keyword.list', params);
       const apiResponse = response.data as MozCompetitorApiResponse;
 
       if (apiResponse.error) {
         throw new Error(`MOZ Competitor API Error: ${apiResponse.error.message}`);
       }
 
-      if (!apiResponse.results || apiResponse.results.length === 0) {
+      if (!apiResponse.result?.ranking_keywords || apiResponse.result.ranking_keywords.length === 0) {
         console.log('No competitor data returned from MOZ API');
         return [];
       }
 
-      return apiResponse.results.map(result => {
-        const commonKeywords = result.common_keywords || 0;
+      // Group by ranking pages to create competitor data
+      const competitorMap = new Map<string, {
+        keywords: number;
+        totalDifficulty: number;
+        totalVolume: number;
+      }>();
+
+      apiResponse.result.ranking_keywords.forEach(result => {
+        if (result.ranking_page) {
+          const domain = new URL(result.ranking_page).hostname;
+          const existing = competitorMap.get(domain) || { keywords: 0, totalDifficulty: 0, totalVolume: 0 };
+          existing.keywords += 1;
+          existing.totalDifficulty += result.difficulty || 0;
+          existing.totalVolume += result.volume || 0;
+          competitorMap.set(domain, existing);
+        }
+      });
+
+      return Array.from(competitorMap.entries()).map(([url, data]) => {
+        const commonKeywords = data.keywords;
         let competitionLevel: 'low' | 'medium' | 'high' = 'low';
         
-        if (commonKeywords > 100) {
+        if (commonKeywords > 20) {
           competitionLevel = 'high';
-        } else if (commonKeywords > 25) {
+        } else if (commonKeywords > 5) {
           competitionLevel = 'medium';
         }
 
         return {
-          url: result.url,
-          domainAuthority: result.domain_authority || 0,
-          pageAuthority: result.page_authority || 0,
-          linkingDomains: result.linking_domains || 0,
-          totalLinks: result.external_links || 0,
+          url,
+          domainAuthority: 0, // Not available in this endpoint
+          pageAuthority: 0, // Not available in this endpoint
+          linkingDomains: 0, // Not available in this endpoint
+          totalLinks: 0, // Not available in this endpoint
           commonKeywords,
           competitionLevel
         };
-      });
+      }).slice(0, limit);
 
     } catch (error) {
       console.error(`❌ MOZ competitor analysis failed for ${domain}:`, error);

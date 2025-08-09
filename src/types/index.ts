@@ -406,6 +406,7 @@ export interface MozKeywordData {
   potential: number;
   ctr: number;
   priority: number;
+  relevance?: number;
 }
 
 export interface MozCompetitorData {

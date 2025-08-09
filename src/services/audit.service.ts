@@ -5,6 +5,7 @@ import { ScrapeService } from './scrape.service.js';
 import { ScreenshotService } from './screenshot.service.js';
 import { AccessibilityService } from './accessibility-new.service.js';
 import { CTAAnalysisService } from './cta-analysis.service.js';
+import { MozService } from './moz.service.js';
 
 export class AuditService {
 
@@ -206,6 +207,39 @@ export class AuditService {
           console.error(`⚠️ Conversion optimization analysis failed for ${pageData.url}:`, conversionError);
           // Continue without conversion optimization analysis
         }
+      }
+
+      // Run MOZ SEO analysis on the primary page (first page only to avoid hitting rate limits)
+      if (pages.length > 0 && MozService.isEnabled() && MozService.isConfigured()) {
+        const primaryPage = pages[0];
+        try {
+          console.log(`🔍 Running MOZ SEO analysis for primary page: ${primaryPage.url}`);
+          const mozAnalysis = await MozService.getUrlMetrics(primaryPage.url);
+          
+          // Add MOZ analysis to the primary page
+          (primaryPage as any).mozAnalysis = {
+            domainAuthority: mozAnalysis.domainAuthority || 0,
+            pageAuthority: mozAnalysis.pageAuthority || 0,
+            spamScore: mozAnalysis.spamScore || 0,
+            linkingDomains: mozAnalysis.linkingDomains || 0,
+            totalLinks: mozAnalysis.totalLinks || 0,
+            mozRank: mozAnalysis.mozRank || 0,
+            mozTrust: mozAnalysis.mozTrust || 0,
+            url: mozAnalysis.url,
+            lastCrawled: mozAnalysis.lastCrawled || new Date().toISOString(),
+            analyzedAt: new Date().toISOString()
+          };
+          
+          console.log(`✅ MOZ SEO analysis completed for ${primaryPage.url}:`, 
+            `DA: ${(primaryPage as any).mozAnalysis.domainAuthority}, PA: ${(primaryPage as any).mozAnalysis.pageAuthority}`);
+        } catch (mozError) {
+          console.error(`⚠️ MOZ SEO analysis failed for ${primaryPage.url}:`, mozError);
+          // Continue without MOZ analysis
+        }
+      } else if (!MozService.isEnabled()) {
+        console.log(`ℹ️ MOZ SEO analysis disabled (set MOZ_ENABLED=true to enable)`);
+      } else if (!MozService.isConfigured()) {
+        console.log(`ℹ️ MOZ SEO analysis not configured (set MOZ_API_TOKEN to enable)`);
       }
 
       // Save all pages to Firebase
