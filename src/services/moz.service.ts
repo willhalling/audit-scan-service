@@ -153,6 +153,16 @@ export class MozService {
       });
 
       if (!response.ok) {
+        // Handle 404 as "not found" rather than error for keyword metrics
+        if (response.status === 404 && method === 'data.keyword.metrics.fetch') {
+          console.log(`   ℹ️  Keyword not found in MOZ database (this is normal for some keywords)`);
+          return { 
+            data: { 
+              error: { code: 404, message: 'Keyword not found in MOZ database' }
+            } as MozApiResponse | MozKeywordApiResponse | MozCompetitorApiResponse, 
+            rateLimitInfo: null 
+          };
+        }
         throw new Error(`MOZ API HTTP error: ${response.status} - ${response.statusText}`);
       }
 
@@ -172,6 +182,11 @@ export class MozService {
 
       return { data: responseData, rateLimitInfo };
     } catch (error) {
+      // Don't log 404 errors as failures for keyword metrics - they're expected
+      if (error instanceof Error && error.message.includes('404') && method === 'data.keyword.metrics.fetch') {
+        // Already logged above, just rethrow
+        throw error;
+      }
       console.error('MOZ API request failed:', error);
       throw error;
     }
@@ -314,51 +329,16 @@ export class MozService {
       // Normalize domain
       const normalizedDomain = domain.replace(/^https?:\/\//, '').replace(/\/$/, '');
 
-      // If specific keywords are provided, get suggestions for those keywords
+      // If specific keywords are provided (from AI), get metrics for those keywords
       if (keywords && keywords.length > 0) {
-        console.log(`🔍 Getting keyword suggestions for ${keywords.length} provided keywords`);
-        return await this.getKeywordSuggestions(keywords);
+        console.log(`🔍 Getting keyword metrics for ${keywords.length} AI-generated keywords: ${keywords.join(', ')}`);
+        return await this.getKeywordMetrics(keywords);
       }
 
-      // Otherwise, get ranking keywords for the domain (default behavior)
-      console.log(`🔍 Getting ranking keywords for domain: ${normalizedDomain}`);
-      const params = {
-        target_query: {
-          query: normalizedDomain,
-          scope: "domain",
-          locale: "en-US"
-        },
-        page: {
-          n: 0,
-          limit: 20
-        },
-        options: {
-          sort: "rank"
-        }
-      };
-
-      const response = await this.makeRequest('data.site.ranking-keyword.list', params);
-      const apiResponse = response.data as MozCompetitorApiResponse;
-
-      if (apiResponse.error) {
-        throw new Error(`MOZ Keyword API Error: ${apiResponse.error.message}`);
-      }
-
-      if (!apiResponse.result?.ranking_keywords || apiResponse.result.ranking_keywords.length === 0) {
-        console.log('No ranking keyword data returned from MOZ API');
-        return [];
-      }
-
-      return apiResponse.result.ranking_keywords.map(result => ({
-        keyword: result.keyword,
-        difficulty: result.difficulty || 0,
-        volume: Math.round((result.volume || 0) * 100) / 100, // Round volume to 2 decimal places
-        opportunity: 0,
-        potential: 0,
-        ctr: 0,
-        priority: 0,
-        relevance: 100 - (result.rank_position || 50) // Higher relevance for better rankings
-      }));
+      // If no keywords provided, return empty array to avoid irrelevant data
+      // The old approach of getting ranking keywords often returned wrong data
+      console.log(`⚠️  No keywords provided, skipping keyword analysis to avoid irrelevant data`);
+      return [];
 
     } catch (error) {
       console.error(`❌ MOZ keyword research failed for ${domain}:`, error);
@@ -367,50 +347,50 @@ export class MozService {
   }
 
   /**
-   * Get keyword suggestions for specific keywords using universal strategy
+   * Get keyword metrics for specific keywords using MOZ Keyword Explorer
    */
-  static async getKeywordSuggestions(keywords: string[]): Promise<MozKeywordData[]> {
-    const allSuggestions: MozKeywordData[] = [];
+  static async getKeywordMetrics(keywords: string[]): Promise<MozKeywordData[]> {
+    const allKeywords: MozKeywordData[] = [];
 
     for (const keyword of keywords) {
       try {
+        // Use correct JSON-RPC structure according to MOZ API docs
         const params = {
           serp_query: {
             keyword: keyword,
             locale: "en-US",
             device: "desktop",
             engine: "google"
-          },
-          page: {
-            n: 0,
-            limit: 10
-          },
-          options: {
-            strategy: "universal" // Use universal strategy as suggested by API
           }
         };
 
-        const response = await this.makeRequest('data.keyword.suggestions.list', params);
-        const apiResponse = response.data as MozKeywordApiResponse;
+        const response = await this.makeRequest('data.keyword.metrics.fetch', params);
+        const apiResponse = response.data as any;
 
         if (apiResponse.error) {
-          console.warn(`⚠️  Keyword suggestions failed for "${keyword}": ${apiResponse.error.message}`);
-          continue; // Skip this keyword and continue with others
+          if (apiResponse.error.code === 404) {
+            console.log(`   📝 "${keyword}" not found in MOZ database (normal for niche keywords)`);
+          } else {
+            console.warn(`⚠️  Keyword metrics failed for "${keyword}": ${apiResponse.error.message}`);
+          }
+          continue;
         }
 
-        if (apiResponse.result?.suggestions && apiResponse.result.suggestions.length > 0) {
-          const suggestions = apiResponse.result.suggestions.map(result => ({
-            keyword: result.keyword,
-            difficulty: 0, // Not available in suggestions endpoint
-            volume: 0, // Not available in suggestions endpoint
-            opportunity: 0,
-            potential: 0,
-            ctr: 0,
-            priority: 0,
-            relevance: Math.round((result.relevance || 0) * 100) / 100 // Round to 2 decimal places
-          }));
-
-          allSuggestions.push(...suggestions);
+        if (apiResponse.result?.keyword_metrics) {
+          const metrics = apiResponse.result.keyword_metrics;
+          allKeywords.push({
+            keyword: keyword,
+            difficulty: metrics.difficulty || 0,
+            volume: metrics.volume || 0,
+            opportunity: metrics.organic_ctr || 0,
+            potential: metrics.priority || 0,
+            ctr: metrics.organic_ctr || 0,
+            priority: metrics.priority || 0,
+            relevance: 100 // AI-generated keywords are highly relevant
+          });
+          console.log(`   ✅ Got metrics for "${keyword}": Volume: ${metrics.volume}, Difficulty: ${metrics.difficulty}, Priority: ${metrics.priority}`);
+        } else {
+          console.log(`   ⚠️  No metrics returned for "${keyword}"`);
         }
 
         // Rate limiting between keyword requests
@@ -419,11 +399,16 @@ export class MozService {
         }
 
       } catch (error) {
-        console.warn(`⚠️  Failed to get suggestions for keyword "${keyword}":`, error);
+        // Check if it's a 404-related error and handle gracefully
+        if (error instanceof Error && error.message.includes('404')) {
+          console.log(`   📝 "${keyword}" not found in MOZ database (normal for specific keywords)`);
+        } else {
+          console.warn(`⚠️  Failed to get metrics for keyword "${keyword}":`, error);
+        }
       }
     }
 
-    return allSuggestions;
+    return allKeywords;
   }
 
   /**
@@ -481,12 +466,19 @@ export class MozService {
 
       apiResponse.result.ranking_keywords.forEach(result => {
         if (result.ranking_page) {
-          const domain = new URL(result.ranking_page).hostname;
-          const existing = competitorMap.get(domain) || { keywords: 0, totalDifficulty: 0, totalVolume: 0 };
+          const competitorDomain = new URL(result.ranking_page).hostname.toLowerCase();
+          const targetDomain = normalizedDomain.toLowerCase();
+          
+          // Skip if this is the same domain as our target
+          if (competitorDomain === targetDomain) {
+            return;
+          }
+          
+          const existing = competitorMap.get(competitorDomain) || { keywords: 0, totalDifficulty: 0, totalVolume: 0 };
           existing.keywords += 1;
           existing.totalDifficulty += result.difficulty || 0;
           existing.totalVolume += result.volume || 0;
-          competitorMap.set(domain, existing);
+          competitorMap.set(competitorDomain, existing);
         }
       });
 
@@ -518,21 +510,17 @@ export class MozService {
   }
 
   /**
-   * Get comprehensive MOZ analysis (metrics + keywords + competitors)
+   * Get comprehensive MOZ analysis (metrics + keyword prioritization)
    */
   static async getFullAnalysis(url: string, options: {
     includeKeywords?: boolean;
-    includeCompetitors?: boolean;
     keywords?: string[] | undefined;
-    competitorLimit?: number;
   } = {}): Promise<MozAnalysisResult> {
     console.log(`🔍 Getting full MOZ analysis for: ${url}`);
 
     const {
       includeKeywords = true,
-      includeCompetitors = true,
-      keywords,
-      competitorLimit = 10
+      keywords
     } = options;
 
     const timestamp = new Date().toISOString();
@@ -557,7 +545,7 @@ export class MozService {
         };
       }
 
-      // Get basic metrics first
+      // Get basic metrics first (site authority snapshot)
       const metrics = await this.getUrlMetrics(url);
 
       const result: MozAnalysisResult = {
@@ -567,24 +555,16 @@ export class MozService {
         rateLimitRemaining: this.rateLimitInfo?.remaining
       };
 
-      // Get keyword data if requested
-      if (includeKeywords && !metrics.error) {
+      // Get keyword prioritization data if requested
+      if (includeKeywords && !metrics.error && keywords && keywords.length > 0) {
         try {
-          const domain = url.replace(/^https?:\/\//, '').split('/')[0];
-          result.keywords = await this.getKeywordData(domain, keywords);
+          console.log(`🔍 Getting keyword prioritization data for ${keywords.length} keywords`);
+          result.keywords = await this.getKeywordMetrics(keywords);
         } catch (error) {
-          console.warn('Failed to get keyword data:', error);
+          console.warn('Failed to get keyword metrics:', error);
         }
-      }
-
-      // Get competitor data if requested
-      if (includeCompetitors && !metrics.error) {
-        try {
-          const domain = url.replace(/^https?:\/\//, '').split('/')[0];
-          result.competitors = await this.getCompetitorData(domain, competitorLimit);
-        } catch (error) {
-          console.warn('Failed to get competitor data:', error);
-        }
+      } else if (includeKeywords && !keywords) {
+        console.log('⚠️  No keywords provided for prioritization analysis');
       }
 
       return result;

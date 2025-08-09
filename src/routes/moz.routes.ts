@@ -440,7 +440,7 @@ router.post('/enhance-audit', async (req: Request, res: Response) => {
         timestamp: new Date().toISOString()
       });
     } else {
-      res.status(400).json({
+      res.status(500).json({
         success: false,
         error: result.message,
         processedUrls: result.processedUrls
@@ -479,7 +479,6 @@ router.get('/audit-summary/:auditId', async (req: Request, res: Response) => {
     res.json({
       success: true,
       data: summary,
-      auditId,
       timestamp: new Date().toISOString()
     });
 

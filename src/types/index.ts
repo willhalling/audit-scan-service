@@ -187,6 +187,7 @@ export interface AIAnalysis {
   meta: {
     title: AIAnalysisSection;
     description: AIAnalysisSection;
+    keywords?: string[];
   };
   content: {
     heading?: AIAnalysisSection;

@@ -13,44 +13,31 @@ export class MozIntegrationService {
       auditId?: string;
       saveToFirestore?: boolean;
       includeKeywords?: boolean;
-      includeCompetitors?: boolean;
       keywords?: string[] | undefined;
-      competitorLimit?: number;
     } = {}
   ): Promise<MozAnalysisResult> {
     const {
       auditId,
       saveToFirestore = false,
       includeKeywords = true,
-      includeCompetitors = true,
-      keywords,
-      competitorLimit = 10
+      keywords
     } = options;
 
     console.log(`🔍 MOZ Integration: Analyzing ${url}`);
 
     try {
-      // Get comprehensive MOZ analysis
+      // Get comprehensive MOZ analysis (updated for new focused approach)
       const mozData = await MozService.getFullAnalysis(url, {
         includeKeywords,
-        includeCompetitors,
-        keywords: keywords || undefined,
-        competitorLimit
+        keywords: keywords || undefined
       });
 
       // Save to Firestore if requested and audit ID provided
       if (saveToFirestore && auditId) {
         try {
-          // Save as separate collection document
-          await firebaseService.saveMozAnalysis(auditId, url, mozData);
-          
-          // Also try to save to page data if page exists
-          try {
-            await firebaseService.saveMozDataToPage(auditId, url, mozData);
-            console.log(`✅ MOZ data saved to both page and separate collection`);
-          } catch (pageError) {
-            console.log(`⚠️  MOZ data saved to collection only (page not found in audit)`);
-          }
+          // Only save to page data (no separate collection needed)
+          await firebaseService.saveMozDataToPage(auditId, url, mozData);
+          console.log(`✅ MOZ data saved to page in audit`);
         } catch (error) {
           console.error(`❌ Failed to save MOZ data to Firestore:`, error);
         }
@@ -90,9 +77,7 @@ export class MozIntegrationService {
       auditId?: string;
       saveToFirestore?: boolean;
       includeKeywords?: boolean;
-      includeCompetitors?: boolean;
       keywords?: string[] | undefined;
-      competitorLimit?: number;
       batchDelay?: number;
     } = {}
   ): Promise<MozAnalysisResult[]> {
@@ -167,13 +152,16 @@ export class MozIntegrationService {
       
       console.log(`📊 Found ${urls.length} unique URLs to analyze`);
 
+      // Get AI keywords from the first page if available
+      const firstPage = audit.pages[0];
+      const aiKeywords = firstPage.ai?.meta?.keywords || undefined;
+
       // Analyze all pages with MOZ
       const mozResults = await this.analyzePages(urls, {
         auditId,
         saveToFirestore: true,
         includeKeywords: true,
-        includeCompetitors: true,
-        competitorLimit: 5 // Smaller limit for batch processing
+        keywords: aiKeywords
       });
 
       const successfulAnalyses = mozResults.filter(result => !result.error);
@@ -203,9 +191,7 @@ export class MozIntegrationService {
     averageDomainAuthority: number;
     averagePageAuthority: number;
     totalKeywords: number;
-    totalCompetitors: number;
     topKeywords: Array<{ keyword: string; difficulty: number; volume: number }>;
-    topCompetitors: Array<{ url: string; domainAuthority: number; competitionLevel: string }>;
   }> {
     console.log(`📊 Getting MOZ summary for audit ${auditId}`);
 
@@ -219,9 +205,7 @@ export class MozIntegrationService {
           averageDomainAuthority: 0,
           averagePageAuthority: 0,
           totalKeywords: 0,
-          totalCompetitors: 0,
-          topKeywords: [],
-          topCompetitors: []
+          topKeywords: []
         };
       }
 
@@ -230,24 +214,14 @@ export class MozIntegrationService {
       const totalDA = validMetrics.reduce((sum, analysis) => sum + analysis.data.metrics.domainAuthority, 0);
       const totalPA = validMetrics.reduce((sum, analysis) => sum + analysis.data.metrics.pageAuthority, 0);
 
-      // Collect all keywords and competitors
+      // Collect all keywords
       const allKeywords = mozAnalyses.flatMap(analysis => analysis.data.keywords || []);
-      const allCompetitors = mozAnalyses.flatMap(analysis => analysis.data.competitors || []);
 
-      // Get top keywords by priority
+      // Get top keywords by priority/relevance
       const topKeywords = allKeywords
-        .sort((a, b) => b.priority - a.priority)
+        .sort((a, b) => (b.relevance || 0) - (a.relevance || 0))
         .slice(0, 10)
         .map(k => ({ keyword: k.keyword, difficulty: k.difficulty, volume: k.volume }));
-
-      // Get top competitors by domain authority
-      const uniqueCompetitors = Array.from(
-        new Map(allCompetitors.map(c => [c.url, c])).values()
-      );
-      const topCompetitors = uniqueCompetitors
-        .sort((a, b) => b.domainAuthority - a.domainAuthority)
-        .slice(0, 10)
-        .map(c => ({ url: c.url, domainAuthority: c.domainAuthority, competitionLevel: c.competitionLevel || 'unknown' }));
 
       return {
         totalPages: mozAnalyses.length,
@@ -255,9 +229,7 @@ export class MozIntegrationService {
         averageDomainAuthority: validMetrics.length > 0 ? Math.round(totalDA / validMetrics.length) : 0,
         averagePageAuthority: validMetrics.length > 0 ? Math.round(totalPA / validMetrics.length) : 0,
         totalKeywords: allKeywords.length,
-        totalCompetitors: uniqueCompetitors.length,
-        topKeywords,
-        topCompetitors
+        topKeywords
       };
 
     } catch (error) {

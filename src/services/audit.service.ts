@@ -214,24 +214,35 @@ export class AuditService {
         const primaryPage = pages[0];
         try {
           console.log(`🔍 Running MOZ SEO analysis for primary page: ${primaryPage.url}`);
-          const mozAnalysis = await MozService.getUrlMetrics(primaryPage.url);
           
-          // Add MOZ analysis to the primary page
+          // Get AI-generated keywords if available
+          const aiKeywords = primaryPage.ai?.meta?.keywords || [];
+          console.log(`🔑 Using AI-generated keywords for MOZ analysis: ${aiKeywords.join(', ')}`);
+          
+          const mozAnalysis = await MozService.getFullAnalysis(primaryPage.url, {
+            includeKeywords: true,
+            keywords: aiKeywords // Pass AI-generated keywords to MOZ
+          });
+          
+          // Add MOZ analysis to the primary page (clean structure without duplicates)
           (primaryPage as any).mozAnalysis = {
-            domainAuthority: mozAnalysis.domainAuthority || 0,
-            pageAuthority: mozAnalysis.pageAuthority || 0,
-            spamScore: mozAnalysis.spamScore || 0,
-            linkingDomains: mozAnalysis.linkingDomains || 0,
-            totalLinks: mozAnalysis.totalLinks || 0,
-            mozRank: mozAnalysis.mozRank || 0,
-            mozTrust: mozAnalysis.mozTrust || 0,
-            url: mozAnalysis.url,
-            lastCrawled: mozAnalysis.lastCrawled || new Date().toISOString(),
-            analyzedAt: new Date().toISOString()
+            domainAuthority: mozAnalysis.metrics.domainAuthority || 0,
+            pageAuthority: mozAnalysis.metrics.pageAuthority || 0,
+            spamScore: mozAnalysis.metrics.spamScore || 0,
+            linkingDomains: mozAnalysis.metrics.linkingDomains || 0,
+            totalLinks: mozAnalysis.metrics.totalLinks || 0,
+            mozRank: mozAnalysis.metrics.mozRank || 0,
+            mozTrust: mozAnalysis.metrics.mozTrust || 0,
+            url: mozAnalysis.metrics.url,
+            lastCrawled: mozAnalysis.metrics.lastCrawled || new Date().toISOString(),
+            analyzedAt: new Date().toISOString(),
+            keywords: mozAnalysis.keywords || [],
+            keywordCount: (mozAnalysis.keywords || []).length
           };
           
           console.log(`✅ MOZ SEO analysis completed for ${primaryPage.url}:`, 
-            `DA: ${(primaryPage as any).mozAnalysis.domainAuthority}, PA: ${(primaryPage as any).mozAnalysis.pageAuthority}`);
+            `DA: ${(primaryPage as any).mozAnalysis.domainAuthority}, PA: ${(primaryPage as any).mozAnalysis.pageAuthority}, ` +
+            `Keywords: ${(primaryPage as any).mozAnalysis.keywordCount}`);
         } catch (mozError) {
           console.error(`⚠️ MOZ SEO analysis failed for ${primaryPage.url}:`, mozError);
           // Continue without MOZ analysis
