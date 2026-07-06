@@ -1,6 +1,6 @@
 {
   "name": "scan-service",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -11,13 +11,12 @@
     "watch": "tsc --watch",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "deploy": "echo '❌ Use deploy:staging or deploy:production instead'",
-    "deploy:staging": "sh ./deploy-staging.sh",
-    "deploy:production": "sh ./deploy.sh production",
+    "deploy": "echo '❌ Use docker:build and docker:push, then update the RunPod endpoint image tag. See RUNPOD_DEPLOY.md'",
+    "docker:build": "docker build -t scan-service .",
+    "docker:run": "docker run -p 8080:8080 --env-file .env scan-service",
     "healthcheck": "node healthcheck.js",
     "healthcheck:port": "node healthcheck.js",
-    "start:debug": "node --trace-warnings dist/index.js",
-    "docker:debug": "sh ./debug-local.sh"
+    "start:debug": "node --trace-warnings dist/index.js"
   },
   "dependencies": {
     "@sparticuz/chromium": "^121.0.0",

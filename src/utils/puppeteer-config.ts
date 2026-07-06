@@ -5,9 +5,12 @@ import chromium from '@sparticuz/chromium';
 
 export class PuppeteerConfig {
   /**
-   * Get simple Puppeteer launch options that work in both local and Cloud Run
+   * Get simple Puppeteer launch options that work in both local and container
+   * deployments (Docker / RunPod / Cloud Run).
    */
   static async getLaunchOptions(): Promise<any> {
+    // K_SERVICE is set by Google Cloud Run. When running in other containers
+    // (e.g. RunPod) we rely on PUPPETEER_EXECUTABLE_PATH being set instead.
     const isCloudRun = !!process.env.K_SERVICE;
     
     // Create unique userDataDir for each browser launch to prevent conflicts

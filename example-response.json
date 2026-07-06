@@ -1,0 +1,124 @@
+{
+  "auditId": "example-com-4r17",
+  "host": "example.com",
+  "url": "https://example.com",
+  "status": "completed",
+  "createdAt": 1720298622025,
+  "completedAt": 1720298922025,
+  "authorUid": "user-uid-optional",
+  "pages": [
+    {
+      "url": "https://example.com",
+      "pagePath": "/",
+      "meta": {
+        "title": "Example Domain",
+        "description": "This domain is for use in illustrative examples in documents.",
+        "keywords": ["example", "domain"],
+        "language": "en",
+        "charset": "UTF-8",
+        "viewport": "width=device-width, initial-scale=1.0",
+        "canonical": "https://example.com"
+      },
+      "isRobotsDoFollow": true,
+      "hasViewportMetaTag": true,
+      "canonical": "https://example.com",
+      "ctas": ["Learn more", "Contact us"],
+      "bodyText": "This domain is for use in illustrative examples in documents. You may use this domain in literature without prior coordination or asking for permission.",
+      "textToHtmlRatio": 0.12,
+      "headers": {
+        "h1": "Example Domain",
+        "h2": ["About", "Services"],
+        "h3": ["Our approach"],
+        "h4": [],
+        "h5": [],
+        "h6": []
+      },
+      "hasSingleH1": true,
+      "wordCount": 28,
+      "wordCloudData": [
+        { "text": "domain", "size": 10 },
+        { "text": "example", "size": 8 },
+        { "text": "documents", "size": 5 }
+      ],
+      "screenshots": {
+        "desktopUrl": "https://storage.googleapis.com/example-bucket/audits/example-com-4r17/desktop.png",
+        "annotatedDesktopUrl": "https://storage.googleapis.com/example-bucket/audits/example-com-4r17/annotated-desktop.png",
+        "annotatedMobileUrl": "https://storage.googleapis.com/example-bucket/audits/example-com-4r17/annotated-mobile.png"
+      },
+      "accessibilityDesktop": {
+        "violations": [
+          {
+            "id": "image-alt",
+            "issue": "Image elements do not have [alt] attributes.",
+            "suggestion": "Add alt text to all images.",
+            "severity": "critical",
+            "isVisual": true
+          }
+        ]
+      },
+      "accessibilityMobile": {
+        "violations": []
+      },
+      "lighthouseDesktop": {
+        "performance": 92,
+        "accessibility": 98,
+        "bestPractices": 100,
+        "seo": 95,
+        "firstContentfulPaint": 1200,
+        "largestContentfulPaint": 1800,
+        "cumulativeLayoutShift": 0.01,
+        "totalBlockingTime": 50,
+        "speedIndex": 1300,
+        "interactionToNextPaint": 1500,
+        "violations": []
+      },
+      "lighthouseMobile": {
+        "performance": 85,
+        "accessibility": 95,
+        "bestPractices": 98,
+        "seo": 90,
+        "firstContentfulPaint": 1800,
+        "largestContentfulPaint": 2500,
+        "cumulativeLayoutShift": 0.03,
+        "totalBlockingTime": 120,
+        "speedIndex": 2100,
+        "interactionToNextPaint": 2200,
+        "violations": []
+      },
+      "ai": {
+        "meta": {
+          "title": {
+            "analysis": "The title is concise and brand-focused.",
+            "suggestions": "Consider adding a primary keyword or value proposition."
+          },
+          "description": {
+            "analysis": "The description explains the domain's purpose clearly.",
+            "suggestions": "Keep under 160 characters and include a call to action."
+          }
+        },
+        "content": {
+          "heading": {
+            "analysis": "Single H1 is present and relevant.",
+            "suggestions": "Use more descriptive H2s for sections."
+          },
+          "cta": {
+            "analysis": "CTAs are visible but generic.",
+            "suggestions": "Make CTAs action-oriented, e.g. 'Get started today'."
+          },
+          "tone": {
+            "analysis": "Tone is neutral and informational.",
+            "suggestions": "Add more brand personality where appropriate."
+          },
+          "readability": {
+            "analysis": "Short sentences make the content easy to read.",
+            "suggestions": "Add subheadings to improve scanability."
+          },
+          "intent": {
+            "analysis": "Page matches informational intent.",
+            "suggestions": "Provide next steps for visitors who want to convert."
+          }
+        }
+      }
+    }
+  ]
+}

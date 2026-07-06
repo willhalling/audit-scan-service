@@ -1,0 +1,10 @@
+{
+  "input": {
+    "action": "startAudit",
+    "url": "https://example.com",
+    "auditId": "example-com-4r17",
+    "pages": ["/about", "/contact"],
+    "authorUid": "user-uid-optional",
+    "enableAI": true
+  }
+}

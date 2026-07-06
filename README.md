@@ -1,22 +1,40 @@
 # Scan Service
 
-A standalone Node.js service for handling heavy website scanning operations including Lighthouse performance audits, comprehensive website scraping, accessibility scanning, and screenshot capture.
+A standalone Node.js service for handling heavy website scanning operations
+including Lighthouse performance audits, comprehensive website scraping,
+accessibility scanning, screenshot capture, and OpenAI-powered content analysis.
+
+This service is designed to run as a **RunPod Serverless** endpoint (custom HTTP
+container). It also works as a standalone Docker container or local Express
+server.
 
 ## Overview
 
-This service extracts all heavy computational tasks from the main Next.js application to4. **Cloud Run container startup issues**:
-   - Ensure the container listens on the port specified by the `PORT` environment variable (8080)
-   - Check that all required environment variables are set in the deployment
-   - Verify that the `NODE_ENV` is set to `production`
-   - Ensure the correct `CMD` is specified in the Dockerfile
-   - **Firebase credentials**: Ensure the Firebase service account JSON is available
-     - Option 1: Include it in the Docker image (for testing only)
-     - Option 2: Pass it as base64-encoded environment variable (recommended for production)as a separate service, typically deployed on Google Cloud Run. This architecture allows:
+Running the scanner as a separate service lets the main Next.js app offload
+heavy, long-running work:
 
 - **Unlimited execution time** for long-running scans
 - **Dedicated resources** for CPU/memory intensive operations
 - **Better scalability** for concurrent scan requests
-- **Isolation** of heavy dependencies from the main app
+- **Isolation** of heavy dependencies (Puppeteer, Lighthouse, Chrome) from the
+  main app
+
+## Architecture
+
+```
+Next.js App (Vercel)          RunPod Serverless          Firebase
+─────────────────────         ───────────────────        ──────────
+POST /run                         POST /run               audits/{auditId}
+{ action: "startAudit" }    ──▶   start background audit  pages[]
+                                  upload screenshots        screenshots
+                                  run Lighthouse            status
+                                  run axe-core
+                                  run AI analysis
+```
+
+Because audits can take several minutes, the default `/run` action starts the
+work in the background and returns an `auditId`. Poll `GET /audit/:auditId` or
+read Firestore to retrieve the completed `AuditResult`.
 
 ## Features
 
@@ -28,14 +46,11 @@ This service extracts all heavy computational tasks from the main Next.js applic
 ### 🔍 Website Scraping & Analysis
 - Comprehensive content analysis
 - SEO metadata extraction
-- Link validation and broken link detection
 - Call-to-action and form analysis
-- Social media presence detection
-- Security header analysis
-- Multi-page scanning support
+- Multi-page scanning support (up to 5 extra pages)
 
 ### ♿ Accessibility Scanning
-- WCAG 2.1 AA compliance testing
+- WCAG 2.1 AA compliance testing via axe-core
 - Visual annotation of accessibility issues
 - Detailed violation reporting with impact levels
 - Screenshot generation with issue markers
@@ -45,399 +60,200 @@ This service extracts all heavy computational tasks from the main Next.js applic
 - Mobile and desktop device simulation
 - Customizable dimensions
 
+### 🤖 AI Analysis
+- GPT-4 powered meta/content analysis
+- Title, description, heading, CTA, tone, readability, and intent sections
+
 ## API Endpoints
 
-### New Audit API (Recommended)
+### RunPod-compatible entrypoints
 
-#### Start Audit
-```
-POST /audit/start
-```
-Start a comprehensive audit that runs all scans and stores results in Firebase.
+RunPod sends jobs as `POST` requests with a body shaped like:
 
-**Request Body:**
 ```json
 {
-  "url": "https://example.com",
-  "useDesktop": true,
-  "categories": ["performance", "accessibility", "seo"]
-}
-```
-
-**Response:**
-```json
-{
-  "auditId": "example-com-4r17"
-}
-```
-
-#### Get Audit Status
-```
-GET /audit/{auditId}
-```
-Get the status and results of an audit.
-
-**Response:**
-```json
-{
-  "auditId": "example-com-4r17",
-  "url": "https://example.com",
-  "status": "completed",
-  "createdAt": 1640995200000,
-  "completedAt": 1640995500000,
-  "stages": {
-    "lighthouse": { /* lighthouse results */ },
-    "accessibility": { /* accessibility results */ },
-    "scrape": { /* scrape results */ },
-    "screenshot": "base64-encoded-image"
+  "input": {
+    "action": "startAudit",
+    "url": "https://example.com",
+    "auditId": "example-com-4r17",
+    "pages": ["/about", "/contact"],
+    "authorUid": "user-uid",
+    "enableAI": true
   }
 }
 ```
 
-#### Download Audit as JSON
-```
-GET /audit/{auditId}/download
-```
-Download the complete audit results as a JSON file.
+| Method | Path | Description |
+|---|---|---|
+| POST | `/run` | Start or run a job asynchronously |
+| POST | `/runsync` | Same as `/run` for compatibility |
 
-**Response:**
-- Returns the complete audit data as a downloadable JSON file
-- Filename: `audit-{auditId}.json`
-- Content-Type: `application/json`
+Supported `action` values:
 
-**Example:**
-```bash
-curl -O "http://localhost:8080/audit/example-com-4r17/download"
-# Downloads: audit-example-com-4r17.json
-```
+- `startAudit` — starts a full audit, returns `{ auditId }`
+- `getAudit` — returns the full `AuditResult` for an `auditId`
+- `lighthouse` — runs a Lighthouse audit synchronously
+- `screenshot` — captures a screenshot synchronously (returns base64 PNG)
+- `warmup` — health ping, returns `{ status: "warm" }`
 
-### Health Check
-```
-GET /health
-```
-Returns service status and health information.
+### Standard HTTP routes
 
-### Individual Scan Endpoints (Legacy)
+| Method | Path | Description |
+|---|---|---|
+| GET | `/health` | Service health and uptime |
+| POST | `/audit/start` | Start a full audit |
+| GET | `/audit/:auditId` | Get audit status/results |
+| GET | `/audit/:auditId/download` | Download audit JSON file |
+| POST/GET | `/lighthouse` | Run Lighthouse |
+| GET | `/screenshot` | Capture PNG screenshot |
+| GET | `/diagnostic/*` | Browser diagnostics |
 
-### Lighthouse Audit
-```
-GET /lighthouse?host=example.com&uid=user123&docId=doc456
-```
-Parameters:
-- `host`: Website URL to scan
-- `uid`: User ID for tracking
-- `docId`: Document ID for data storage
+### Example response
 
-### Website Scraping
-```
-GET /scrape?host=example.com&uid=user123&docId=doc456&mode=full
-```
-Parameters:
-- `host`: Website URL to scrape
-- `uid`: User ID for tracking  
-- `docId`: Document ID for data storage
-- `mode`: Scan mode (`single`, `full`, `custom`)
-- `customSubpages`: JSON array of specific pages to scan (optional)
-
-### Accessibility Scan
-```
-GET /accessibility?host=example.com&uid=user123&docId=doc456&deviceType=desktop
-```
-Parameters:
-- `host`: Website URL to scan
-- `uid`: User ID for tracking
-- `docId`: Document ID for data storage
-- `deviceType`: Device type (`desktop` or `mobile`)
-- `screenshotWidth`: Custom screenshot width (optional)
-- `screenshotHeight`: Custom screenshot height (optional)
-- `skipFirestore`: Skip Firestore save (optional, for per-page scanning)
-
-### Screenshot Capture
-```
-GET /screenshot?host=example.com&uid=user123&docId=doc456&width=1366&height=768
-```
-Parameters:
-- `host`: Website URL to capture
-- `uid`: User ID for tracking
-- `docId`: Document ID for data storage  
-- `width`: Screenshot width (default: 1366)
-- `height`: Screenshot height (default: 768)
-- `fullPage`: Capture full page (`true` or `false`)
+See [`example-response.json`](./example-response.json) for a complete
+`AuditResult` payload returned by `GET /audit/:auditId` or the RunPod
+`getAudit` action.
 
 ## Installation
 
-### Local Development
+### Local development
 
 1. Install dependencies:
+
 ```bash
 npm install
 ```
 
-2. Start the service:
+2. Copy the environment example and fill in the values:
+
+```bash
+cp .env.example .env
+```
+
+3. Start the service:
+
 ```bash
 npm start
 ```
 
-The service will run on port 8080 by default.
+The service will run on port `8080` by default.
 
-### Docker Deployment
+### Docker
 
-Build the Docker image:
+Build the image:
+
 ```bash
-docker build -t scan-service .
+npm run docker:build
 ```
 
 Run the container:
+
 ```bash
-docker run -p 8080:8080 scan-service
+npm run docker:run
 ```
 
-### Google Cloud Run Deployment
+## Deploying to RunPod
 
-Deploy using the provided script:
+See [`RUNPOD_DEPLOY.md`](./RUNPOD_DEPLOY.md) for full instructions, including:
+
+- Creating the RunPod Serverless endpoint
+- Required environment variables
+- Building and pushing the Docker image
+- Testing the endpoint
+
+Quick summary:
+
+1. Build and push the Docker image:
+
 ```bash
-chmod +x deploy.sh
-./deploy.sh
+docker build -t yourdockeruser/scan-service:v1 .
+docker push yourdockeruser/scan-service:v1
 ```
 
-Or manually:
+2. In RunPod, create a Serverless Endpoint using that image, set the container
+   port to `8080`, and add the environment variables from `.env.example`.
+
+3. Send a test request:
+
 ```bash
-gcloud run deploy scan-service \\
-  --source . \\
-  --platform managed \\
-  --region us-central1 \\
-  --allow-unauthenticated \\
-  --memory 2Gi \\
-  --cpu 2 \\
-  --timeout 3600 \\
-  --max-instances 10
+curl https://api.runpod.ai/v2/<ENDPOINT_ID>/run \
+  -H "Authorization: Bearer $RUNPOD_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d @test-input.json
 ```
-
-## Dependencies
-
-### Core Dependencies
-- **express**: Web framework
-- **cors**: Cross-origin resource sharing
-- **puppeteer**: Browser automation for screenshots and accessibility
-- **lighthouse**: Performance auditing
-- **cheerio**: Server-side HTML parsing
-- **axios**: HTTP client for web requests
-- **sharp**: Image processing for screenshot annotation
-- **p-retry**: Retry mechanism for resilient requests
-- **user-agents**: Random user agent generation
-
-### System Dependencies (for Docker)
-- Chromium browser
-- System fonts for proper rendering
-- Image processing libraries for Canvas/Sharp
 
 ## Configuration
 
-### Environment Variables
-- `PORT`: Service port (default: 8080)
-- `SCAN_SERVICE_URL`: URL for the scan service (used by main app)
-- `FIREBASE_SERVICE_ACCOUNT`: Base64-encoded Firebase service account JSON (for Cloud Run)
+### Environment variables
 
-### Main App Integration
+| Variable | Required | Description |
+|---|---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | Yes | Firebase service account JSON as a single-line string |
+| `OPENAI_API_KEY` | Yes | OpenAI API key for AI analysis |
+| `NODE_ENV` | Recommended | `production` in production |
+| `PORT` | No | Service port (default: `8080`) |
+| `PUPPETEER_EXECUTABLE_PATH` | No | Chrome binary path (default: `/usr/bin/google-chrome-stable` in Docker) |
 
-Update your main application's environment variables:
-```env
-SCAN_SERVICE_URL=https://your-scan-service-url
-```
+## Dependencies
 
-For local development:
-```env
-SCAN_SERVICE_URL=http://localhost:8080
-```
+### Core
+- **express**: Web framework
+- **cors**: Cross-origin resource sharing
+- **puppeteer-core**: Browser automation
+- **lighthouse**: Performance auditing
+- **axe-core**: Accessibility rules
+- **cheerio**: Server-side HTML parsing
+- **axios**: HTTP client
+- **sharp**: Image processing
+- **openai**: GPT-4 analysis
+- **firebase-admin**: Firestore and Storage persistence
 
-## Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐
-│   Next.js App   │───▶│  Scan Service   │
-│  (Vercel)       │    │ (Cloud Run)     │
-├─────────────────┤    ├─────────────────┤
-│ • API Routes    │    │ • Lighthouse    │
-│ • UI Components │    │ • Scraping      │
-│ • Firestore     │    │ • Accessibility │
-│ • Auth          │    │ • Screenshots   │
-└─────────────────┘    └─────────────────┘
-```
-
-## Error Handling
-
-The service implements comprehensive error handling:
-- Request validation
-- Timeout management
-- Browser cleanup
-- Graceful degradation
-- Detailed error reporting
+### System dependencies (in Docker)
+- Google Chrome Stable
+- System fonts for proper rendering
+- Image processing libraries for Canvas/Sharp
 
 ## Monitoring
 
-### Health Checks
-The `/health` endpoint provides service status for monitoring systems.
+### Health checks
+`GET /health` returns service status and uptime. Use this for RunPod health
+probes or local monitoring.
 
 ### Logging
-Structured logging with different levels:
-- Request/response logging
-- Error tracking
-- Performance metrics
-- Step-by-step progress tracking
+Structured console logging covers request handling, audit progress, errors,
+and browser lifecycle events.
 
 ## Testing
 
-Run the test suite:
-```bash
-node ../test-scan-service.js
-```
+RunPod test input is provided in [`test-input.json`](./test-input.json).
 
-This tests all endpoints with a sample website to ensure functionality.
-
-## Performance Considerations
-
-### Resource Limits
-- Memory: 2GB recommended for Cloud Run
-- CPU: 2 vCPU recommended for concurrent scans
-- Timeout: Up to 60 minutes for comprehensive scans
-
-### Optimization
-- Browser instance reuse where possible
-- Request batching for link validation
-- Image optimization for screenshots
-- Parallel processing for multi-page scans
-
-## Security
-
-### Input Validation
-- URL validation and sanitization
-- Parameter validation
-- Rate limiting considerations
-
-### Browser Security
-- Sandboxed Chromium execution
-- No JavaScript execution on target sites
-- Isolated browser contexts
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Browser launch failures**
-   - Ensure system dependencies are installed
-   - Check memory limits
-   - Verify Docker configuration
-
-2. **Timeout errors**
-   - Increase service timeout limits
-   - Check target website responsiveness
-   - Monitor resource usage
-
-3. **Screenshot annotation failures**
-   - Verify Sharp dependencies
-   - Check image processing libraries
-   - Monitor memory usage during processing
-
-4. **Cloud Run container startup issues**
-   - Ensure the container listens on the port specified by the `PORT` environment variable (8080)
-   - Check that all required environment variables are set in the deployment
-   - Verify that the `NODE_ENV` is set to `production`
-   - Ensure the correct `CMD` is specified in the Dockerfile
-
-### Debugging
-
-#### Local Container Testing
-
-Test the container locally before deploying:
+Local quick test:
 
 ```bash
-# Test container locally
-./debug-local.sh
+# Start the server first
+npm start
 
-# Check if the health endpoint responds
+# Health check
 curl http://localhost:8080/health
+
+# Start an audit
+curl -X POST http://localhost:8080/run \
+  -H "Content-Type: application/json" \
+  -d @test-input.json
+
+# Poll for the result
+curl http://localhost:8080/audit/example-com-4r17
 ```
 
-#### View Cloud Run Logs
+## Performance considerations
 
-Check the container logs in Cloud Run:
-
-```bash
-# View the most recent logs
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=scan-service" --limit 50
-
-# Filter for error logs only
-gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=scan-service AND severity>=ERROR" --limit 20
-```
-
-#### Health Check Verification
-
-The health check endpoint provides detailed diagnostic information:
-
-```bash
-# Get the service URL
-SERVICE_URL=$(gcloud run services describe scan-service --region us-central1 --format="value(status.url)")
-
-# Check the health endpoint
-curl -s "$SERVICE_URL/health"
-```
-
-Enable verbose logging by setting log levels in the application code or checking Cloud Run logs for detailed error information.
-
-## Contributing
-
-When making changes:
-1. Test locally with `npm start`
-2. Run integration tests
-3. Update documentation
-4. Deploy to staging environment first
+- Audits are CPU and memory intensive because they launch Chrome. RunPod
+  workers with at least 2 vCPU / 4 GB RAM are recommended.
+- Full audits can take minutes. Use the async `startAudit` + polling pattern
+  rather than waiting synchronously.
+- Browser instances are reused and cleaned up aggressively to avoid memory
+  leaks.
 
 ## License
 
 This service is part of the AuditWidget.com application.
-
-## Using This API from Next.js (or Any Frontend)
-
-You can call the audit API from your Next.js app using `fetch` or `axios`. Here’s an example using `fetch` in an API route or server action:
-
-```js
-// Example: pages/api/start-audit.js (Next.js API route)
-export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    const { url, pages } = req.body;
-
-    const response = await fetch('https://your-api-endpoint/audit/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url, pages }),
-    });
-
-    const data = await response.json();
-    res.status(response.status).json(data);
-  } else {
-    res.status(405).json({ error: 'Method not allowed' });
-  }
-}
-```
-
-**Client-side usage (React/Next.js):**
-```js
-// Example: Trigger audit from a form
-const startAudit = async () => {
-  const res = await fetch('/api/start', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      url: 'https://example.com',
-      pages: ['/about', '/contact']
-    }),
-  });
-  const data = await res.json();
-  // handle response
-};
-```
-
-**Notes:**
-- Replace `'https://your-api-endpoint/audit/start'` with your deployed API URL.
-- The API expects a POST request with a JSON body containing at least a `url` and optionally a `pages` array.
-- You can use this pattern in any framework (Next.js, React, Vue, etc.) that supports HTTP requests.

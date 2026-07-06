@@ -1,10 +1,15 @@
-# Use Node.js base image
+# RunPod / Docker image for the audit scan service.
+#
+# This container runs an Express HTTP server that can be deployed as a
+# RunPod Serverless endpoint (custom HTTP container) or as a standalone
+# Docker service. The server exposes /health, /run and /runsync in addition
+# to the regular /audit, /lighthouse, /screenshot and /diagnostic routes.
 FROM node:20-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies and Google Chrome (more reliable than chromium)
+# Install dependencies and Google Chrome (more reliable than bundled Chromium)
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -39,9 +44,6 @@ ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PORT=8080
-ENV FIREBASE_SERVICE_ACCOUNT=""
-# FIREBASE_SERVICE_ACCOUNT will be set at runtime via Cloud Run environment variables
-
 
 # Install dumb-init for proper signal handling and zombie reaping
 RUN apt-get update && apt-get install -y dumb-init && rm -rf /var/lib/apt/lists/*
@@ -54,7 +56,7 @@ RUN google-chrome-stable --version && \
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
+# Install dependencies (include dev so we can build TypeScript)
 RUN npm install --include=dev
 
 # Copy source code
@@ -66,7 +68,8 @@ RUN npm run build
 # Remove devDependencies for production
 RUN npm prune --production
 
-# Expose the port Cloud Run expects
+# Expose the port the service listens on. In RunPod you must configure the
+# endpoint to route traffic to this same port (default 8080).
 EXPOSE 8080
 
 # Start the app with dumb-init for proper signal handling
