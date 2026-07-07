@@ -45,7 +45,9 @@ In RunPod → your endpoint → **Variables**, add:
 
 | Variable | Purpose |
 |---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | Full Firebase service-account JSON as a single-line string. Used to write audit results to Firestore and upload screenshots to Storage. |
+| `FIREBASE_PROJECT_ID` | Your Firebase project ID (same as in the service account JSON). |
+| `FIREBASE_CLIENT_EMAIL` | Service account `client_email`. |
+| `FIREBASE_PRIVATE_KEY` | Service account `private_key` pasted as one line. |
 | `OPENAI_API_KEY` | Required for AI analysis (`enableAI: true`). |
 | `NODE_ENV` | Set to `production`. |
 | `PORT` | `8080` (the port the internal Node.js server listens on). |
@@ -54,6 +56,11 @@ Optional:
 
 | Variable | Purpose |
 |---|---|
+| `FIREBASE_SERVICE_ACCOUNT` | Full service account JSON (alternative to the three vars above). |
+| `FIREBASE_PRIVATE_KEY_ID` | Service account `private_key_id`. |
+| `FIREBASE_CLIENT_ID` | Service account `client_id`. |
+| `FIREBASE_CLIENT_CERT_URL` | Service account `client_x509_cert_url`. |
+| `FIREBASE_STORAGE_BUCKET` | Defaults to `{projectId}.firebasestorage.app`. |
 | `PUPPETEER_EXECUTABLE_PATH` | Defaults to `/usr/bin/google-chrome-stable` in the Docker image. You normally do not need to override this. |
 | `LOG_LEVEL` | `INFO` or `DEBUG`. |
 

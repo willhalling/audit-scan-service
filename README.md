@@ -192,11 +192,16 @@ curl https://api.runpod.ai/v2/<ENDPOINT_ID>/run \
 
 | Variable | Required | Description |
 |---|---|---|
-| `FIREBASE_SERVICE_ACCOUNT` | Yes | Firebase service account JSON as a single-line string |
+| `FIREBASE_PROJECT_ID` | Yes* | Firebase project ID |
+| `FIREBASE_CLIENT_EMAIL` | Yes* | Service account `client_email` |
+| `FIREBASE_PRIVATE_KEY` | Yes* | Service account `private_key` as one line |
+| `FIREBASE_SERVICE_ACCOUNT` | Yes* | Full service account JSON as one line (alternative to the three above) |
 | `OPENAI_API_KEY` | Yes | OpenAI API key for AI analysis |
 | `NODE_ENV` | Recommended | `production` in production |
 | `PORT` | No | Service port (default: `8080`) |
 | `PUPPETEER_EXECUTABLE_PATH` | No | Chrome binary path (default: `/usr/bin/google-chrome-stable` in Docker) |
+
+\* Provide either `FIREBASE_SERVICE_ACCOUNT` or the three individual `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` vars.
 
 ## Dependencies
 

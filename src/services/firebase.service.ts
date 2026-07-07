@@ -2,21 +2,43 @@ import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
 import { AuditResult, PageData } from '../types/index.js';
 
-// Default Firebase config
+// Minimal service-account fields required by firebase-admin.
+// We reconstruct the certificate from env vars so you don't have to paste the
+// whole JSON into RunPod (matches the wavecanvas-lyrics-worker pattern).
+function buildServiceAccount() {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.log('Using Firebase service account from FIREBASE_SERVICE_ACCOUNT env var');
+    try {
+      return JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch (error) {
+      console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
+      throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT format');
+    }
+  }
 
-const DEFAULT_FIREBASE_CONFIG = {
-  "type": "service_account",
-  "project_id": "audit-widget",
-  "private_key_id": "d37ea464823b557f8aa6499a93e89f1aa0770b17",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDAIskTDy0FqwBn\nuGUf5qFbInX5OwHyjnK+zcNRfGaiuLZ3vazleE0jr68N8Vz5lfkYmusEsyeDTPN8\n8R2qFDVzDlWlwtntDhmvEGoC+kveVdLjvWLuW0NuZjJ1nZPWCSIm374QbPRzrE2U\nUJADA1xBLUg7E+iKoOo2Qjiy4WLaEW3zVVcVcTycIOj14Q0ACm9kuXLpkkr4s3Ia\nvRRs28qdEML3qHuGs0JMzT28wwTbSWbp0Y/lLUFxFUmTKhHDvBm/10lWhBm8BBLf\n8SIsaxMj/rPZwk1mshX3jdkteThCKDgZ90SkuYTWmzs31w/n8QUUgv0A+FUZjWqQ\nueEr85ulAgMBAAECggEACcV7HmoGKySgN6YsFmw/RohBIbS7i59s/IEwbsN54Mqu\nFPbjhSQSID9+EqJ0zQiwi2zNiQanesj+FRuaG509fqV6+5wmQyUVb07RZWdfVmZc\n/FIUZvTjQAkYhdzGuPrr7rgwTVuNLxjTNTjHqi+QkIwCAWcoy2wVnT7O7WIDCf4E\nX3o/Y4m1grMArRW2i3GB1MIK5gtgFww24F5rW2EXLdev+MQOcIdF4+FaooHADB0o\n/cXyosfVGPGZK1iCyWoItfIyTk88g27KWP+Uodezvhiw0MueRVd2+c8u2POC+YF2\n/OHaSnQenOXNi60bEsA140cCoNTGdNOwssSlu72LYQKBgQDeoIb86uX/LM/nwrlh\n3z2IJIlvWMXkaG3znzw1YQpmfpzHbC7knGsm/v3gaJ8bNHarphPkQk67mj1Qi21g\n/oZW32RSrvu3pbL7bHbYO1ClUSdwbUR53cbxukj7S9ukl1m9CrCahShTNB94nddw\nja9/kgDnpa4ZJpPf5AXchjoyPQKBgQDc8CMofPN22wnGb2tJpax4Kp1CxYtVjntD\n6QIo37IqDre9wbLy9nB5sFXkXgTW/3F8IkHm4DPdkh/HflpKKTo03GKpMYO2I+Nt\nVpp/57T/d2gNd6wPN60iJPxPUOHdUw72FDQ3qAXcEdKYeWHNS2kHRv1xnWPxUpbN\nsUj8jYItiQKBgFxPJ2mbZH5n8FTissdYL0VSEQJwRq2sd1q6vdZMRGm3Of6eZts3\n2F41AMOZ3c8D8+i8VichL1AuZhoNle7P2pgOzKRUFd9R/2Ks2KJUBd5mRfoh9HCr\neqAkY7p++7XFY9o0ooGPkObfB+WVXQ04UnqM6X8jfYrEKjB9dci4h0zpAoGAVJ0X\nKetopo1OmhOTyDnN6puPbMIREawmoyR6skKxjg/i6KZlLU2aV9BjpLkpK1nbEYph\nKNWWp3XN++31EE/nvdTlaBzRb5EhCX/QXcnUdL47OGUrnQxanygBBTNZvRSRN0cX\nlHUiAV1GBST/gsstpx7V84wueX6CyLXr2OUtBNkCgYEAxCLmNfB1TJYJEjLyvO2N\ndBKVeTdtWHvDbzbe0YjPH528qKIeQVZh08jienwVGXe0wPw8thl/90Q/xjlWYiUp\nKKicH85oJ60KJIYq0HaRfDAU/Ko/2m18B7Ey5hK8dA7Gy+dHJFzPfrPpvaFVpqPY\ndOz8KLHhMYXHhpjjd0wTNIU=\n-----END PRIVATE KEY-----\n",
-  "client_email": "firebase-adminsdk-fbsvc@audit-widget.iam.gserviceaccount.com",
-  "client_id": "101835604209885374656",
-  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-  "token_uri": "https://oauth2.googleapis.com/token",
-  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40audit-widget.iam.gserviceaccount.com",
-  "universe_domain": "googleapis.com"
-};
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+
+  if (projectId && clientEmail && privateKey) {
+    console.log('Using Firebase credentials from individual env vars');
+    return {
+      type: 'service_account',
+      project_id: projectId,
+      private_key: privateKey.replace(/\\n/g, '\n'),
+      client_email: clientEmail,
+      // Optional extras (not required for Firestore auth).
+      ...(process.env.FIREBASE_PRIVATE_KEY_ID ? { private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID } : {}),
+      ...(process.env.FIREBASE_CLIENT_ID ? { client_id: process.env.FIREBASE_CLIENT_ID } : {}),
+      ...(process.env.FIREBASE_CLIENT_CERT_URL ? { client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL } : {})
+    };
+  }
+
+  throw new Error(
+    'Firebase credentials not provided. Set either FIREBASE_SERVICE_ACCOUNT (full JSON) ' +
+    'or FIREBASE_PROJECT_ID + FIREBASE_CLIENT_EMAIL + FIREBASE_PRIVATE_KEY.'
+  );
+}
 
 // Mock Firebase service when no credentials are available
 class MockFirebaseService {
@@ -43,38 +65,22 @@ class FirebaseService {
       console.log('Environment check:');
       console.log('- NODE_ENV:', process.env.NODE_ENV);
       console.log('- FIREBASE_SERVICE_ACCOUNT exists:', !!process.env.FIREBASE_SERVICE_ACCOUNT);
+      console.log('- FIREBASE_PROJECT_ID exists:', !!process.env.FIREBASE_PROJECT_ID);
+      console.log('- FIREBASE_CLIENT_EMAIL exists:', !!process.env.FIREBASE_CLIENT_EMAIL);
       console.log('- FIREBASE_PRIVATE_KEY exists:', !!process.env.FIREBASE_PRIVATE_KEY);
       
       if (getApps().length === 0) {
         console.log('No Firebase apps initialized yet, creating a new one');
-        let serviceAccount;
-        // Remove mock fallback: always require credentials
-        if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-          console.log('Using Firebase service account from FIREBASE_SERVICE_ACCOUNT environment variable');
-          try {
-            serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-          } catch (error) {
-            console.error('Failed to parse FIREBASE_SERVICE_ACCOUNT:', error);
-            throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT format');
-          }
-        } else if (process.env.FIREBASE_PRIVATE_KEY) {
-          console.log('Using Firebase credentials from individual environment variables');
-          serviceAccount = {
-            ...DEFAULT_FIREBASE_CONFIG,
-            private_key_id: process.env.FIREBASE_PRIVATE_KEY_ID,
-            private_key: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-            client_email: process.env.FIREBASE_CLIENT_EMAIL,
-            client_id: process.env.FIREBASE_CLIENT_ID,
-            client_x509_cert_url: process.env.FIREBASE_CLIENT_CERT_URL
-          };
-        } else {
-          throw new Error('FIREBASE credentials not provided. Set FIREBASE_SERVICE_ACCOUNT or FIREBASE_PRIVATE_KEY and related env vars.');
+        const serviceAccount = buildServiceAccount();
+        const projectId = serviceAccount.project_id || process.env.FIREBASE_PROJECT_ID;
+        if (!projectId) {
+          throw new Error('Could not determine Firebase projectId');
         }
-        console.log('Initializing Firebase with config...');
+        console.log('Initializing Firebase with projectId:', projectId);
         this.app = initializeApp({
           credential: cert(serviceAccount),
-          projectId: 'audit-widget',
-          storageBucket: 'audit-widget.firebasestorage.app'
+          projectId,
+          storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`
         });
       } else {
         console.log('Using existing Firebase app');
