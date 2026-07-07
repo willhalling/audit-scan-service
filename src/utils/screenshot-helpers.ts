@@ -8,6 +8,7 @@ export const ELEMENTS_TO_HIDE = [
   '.cookiebot-popup',                // Alternative Cookiebot selector
   '#cookie-banner',                  // Generic cookie banner
   '.cookie-banner',                  // Generic cookie banner class
+  '#managed-sites-cookie-banner',    // ManagedSites cookie banner
   '.cookie-notice',                  // Cookie notice
   '#cookie-consent',                 // Cookie consent
   '.gdpr-banner',                    // GDPR banner
@@ -20,6 +21,7 @@ export const ELEMENTS_TO_HIDE = [
   '.hs-overlay',                     // HubSpot overlay
   '[id*="cookie"]',                  // Any element with "cookie" in ID
   '[class*="cookie"]',               // Any element with "cookie" in class
+  '#sales-preview-banner',           // ManagedSites sales preview banner
   '.popup-overlay',                  // Generic popup overlay
   '.modal-backdrop',                 // Bootstrap modal backdrop
   // Map-related elements to hide

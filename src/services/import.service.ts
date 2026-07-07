@@ -10,7 +10,10 @@ interface ImportResponse {
  *
  * Configured via MANAGED_SITES_APP_URL and AUDIT_SERVICE_SECRET env vars.
  */
-export async function importManagedSitesPreview(url: string): Promise<ImportResponse | null> {
+export async function importManagedSitesPreview(
+  url: string,
+  auditId?: string
+): Promise<ImportResponse | null> {
   const appUrl = process.env.MANAGED_SITES_APP_URL;
   const secret = process.env.AUDIT_SERVICE_SECRET;
 
@@ -32,7 +35,7 @@ export async function importManagedSitesPreview(url: string): Promise<ImportResp
         'Content-Type': 'application/json',
         'x-audit-secret': secret
       },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify({ url, auditId }),
       signal: controller.signal
     });
 

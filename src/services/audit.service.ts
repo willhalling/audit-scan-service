@@ -96,13 +96,12 @@ export class AuditService {
       // 5. Build the ManagedSites preview, capture its screenshots and scores
       await firebaseService.updateAuditStatus(auditId, 'building');
       const modernSite: ModernSite = {};
-      const preview = await importManagedSitesPreview(url);
+      const preview = await importManagedSitesPreview(url, auditId);
 
       if (preview) {
         modernSite.previewUrl = preview.previewUrl;
         modernSite.friendlyId = preview.friendlyId;
         modernSite.businessId = preview.businessId;
-
         const modernScreenshots = await ScreenshotService.takePlainScreenshots(
           preview.previewUrl,
           auditId,
