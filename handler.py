@@ -7,27 +7,9 @@ RunPod's Python SDK handles the job queue. This wrapper:
 3. Forwards each RunPod job to http://localhost:PORT/run.
 4. Returns the JSON response back to RunPod.
 
-Expected input (RunPod passes this as event["input"]):
-
-    {
-        "action": "startAudit",
-        "url": "https://example.com",
-        "auditId": "example-com-4r17",
-        "pages": ["/about", "/contact"],
-        "authorUid": "user-uid-optional",
-        "enableAI": true
-    }
-
-Supported actions mirror the Node.js /run endpoint:
-    - startAudit   -> { auditId }
-    - getAudit     -> full AuditResult
-    - lighthouse   -> LighthouseResult
-    - screenshot   -> { imageBase64, contentType, size }
-    - warmup       -> { status: "warm" }
-
-Because full website audits can take several minutes, startAudit begins the
-work in the background and immediately returns an auditId. Poll getAudit (or
-check Firestore) to retrieve the completed result.
+Because website audits can take several minutes, startAudit begins the work in
+the background and immediately returns an auditId. Poll getAudit (or check
+Firestore) to retrieve the completed result.
 """
 from __future__ import annotations
 
@@ -44,20 +26,27 @@ from typing import Any
 import requests
 import runpod
 
-log = logging.getLogger("handler")
+# Force immediate log flushing so RunPod captures everything.
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s [%(levelname)s] %(message)s",
+    stream=sys.stdout,
+    force=True,
 )
+log = logging.getLogger("handler")
 
-# Configuration
 PORT = int(os.getenv("PORT", "8080"))
 HEALTH_URL = f"http://127.0.0.1:{PORT}/health"
 RUN_URL = f"http://127.0.0.1:{PORT}/run"
 NODE_CMD = ["node", "dist/index.js"]
 
-# Global reference to the Node.js child process
 _node_process: subprocess.Popen | None = None
+
+
+def _log(message: str) -> None:
+    """Print and flush immediately so RunPod logs are realtime."""
+    print(message, flush=True)
+    log.info(message)
 
 
 def _start_node_server() -> subprocess.Popen:
@@ -65,10 +54,10 @@ def _start_node_server() -> subprocess.Popen:
     global _node_process
 
     if _node_process is not None and _node_process.poll() is None:
-        log.info("Node.js server already running (pid=%s)", _node_process.pid)
+        _log(f"Node.js server already running (pid={_node_process.pid})")
         return _node_process
 
-    log.info("Starting Node.js server: %s", " ".join(NODE_CMD))
+    _log(f"Starting Node.js server: {' '.join(NODE_CMD)}")
     env = os.environ.copy()
     env["PORT"] = str(PORT)
 
@@ -77,23 +66,24 @@ def _start_node_server() -> subprocess.Popen:
         cwd="/app",
         env=env,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,
         text=True,
+        bufsize=1,
     )
 
-    # Stream Node.js logs in a background thread so they appear in RunPod logs
-    def _stream_logs():
+    def _stream(stream, label: str):
         try:
-            for line in _node_process.stdout:  # type: ignore
+            for line in stream:
                 if line:
-                    print(line.rstrip())
-        except Exception:
-            pass
+                    _log(f"[{label}] {line.rstrip()}")
+        except Exception as e:
+            _log(f"[{label}] stream closed: {e}")
 
     import threading
-    threading.Thread(target=_stream_logs, daemon=True).start()
+    threading.Thread(target=_stream, args=(_node_process.stdout, "node"), daemon=True).start()
+    threading.Thread(target=_stream, args=(_node_process.stderr, "node-err"), daemon=True).start()
 
-    log.info("Node.js server started (pid=%s)", _node_process.pid)
+    _log(f"Node.js server started (pid={_node_process.pid})")
     return _node_process
 
 
@@ -104,11 +94,12 @@ def _wait_for_health(timeout: float = 120.0) -> bool:
         try:
             response = requests.get(HEALTH_URL, timeout=5)
             if response.status_code == 200:
-                log.info("Node.js /health ready: %s", response.text[:200])
+                _log(f"Node.js /health ready: {response.text[:200]}")
                 return True
-        except requests.RequestException:
-            pass
-        time.sleep(0.5)
+        except requests.RequestException as e:
+            _log(f"Health check not ready yet: {e}")
+        time.sleep(1.0)
+    _log("Node.js /health never became ready")
     return False
 
 
@@ -119,48 +110,50 @@ def _ensure_server_running() -> bool:
     if _node_process is None or _node_process.poll() is not None:
         _node_process = _start_node_server()
         if not _wait_for_health():
-            log.error("Node.js server failed to become healthy")
+            _log("ERROR: Node.js server failed to become healthy")
             return False
     return True
 
 
 def handler(event: dict) -> Any:
     """RunPod serverless entrypoint."""
+    _log(f"HANDLER CALLED: {json.dumps(event)[:500]}")
+
     job_input = (event or {}).get("input") or {}
 
-    # Warmup ping — just return immediately to keep the worker alive.
     if job_input.get("warmup"):
+        _log("Warmup requested")
         return {"status": "warm"}
 
     if not _ensure_server_running():
         return {"error": "Node.js server failed to start"}
 
     try:
-        log.info("Forwarding job to Node.js: %s", json.dumps(job_input)[:500])
+        _log(f"Forwarding job to Node.js: {json.dumps(job_input)[:500]}")
         response = requests.post(
             RUN_URL,
             json=event,
             headers={"Content-Type": "application/json"},
             timeout=3600,
         )
+        _log(f"Node.js responded with HTTP {response.status_code}")
         response.raise_for_status()
         result = response.json()
-        log.info("Node.js response: %s", json.dumps(result)[:500])
+        _log(f"Node.js result: {json.dumps(result)[:500]}")
         return result
     except requests.HTTPError as e:
-        log.error("HTTP error from Node.js: %s", e)
+        _log(f"HTTP error from Node.js: {e}")
         try:
             return e.response.json()
         except Exception:
             return {"error": f"HTTP {e.response.status_code}", "message": str(e)}
     except Exception as e:
-        log.error("Handler failed: %s\n%s", e, traceback.format_exc())
+        _log(f"Handler failed: {e}\n{traceback.format_exc()}")
         return {"error": str(e)[:500]}
 
 
 def _shutdown(signum, frame):
-    """Gracefully terminate the Node.js child process on shutdown."""
-    log.info("Received signal %s, shutting down Node.js server", signum)
+    _log(f"Received signal {signum}, shutting down Node.js server")
     if _node_process is not None:
         try:
             _node_process.terminate()
@@ -177,4 +170,5 @@ signal.signal(signal.SIGTERM, _shutdown)
 signal.signal(signal.SIGINT, _shutdown)
 
 if __name__ == "__main__":
+    _log("Starting RunPod serverless handler")
     runpod.serverless.start({"handler": handler})
