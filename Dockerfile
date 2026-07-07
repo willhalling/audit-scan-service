@@ -1,15 +1,16 @@
-# RunPod / Docker image for the audit scan service.
+# RunPod Serverless image for the audit scan service.
 #
-# This container runs an Express HTTP server that can be deployed as a
-# RunPod Serverless endpoint (custom HTTP container) or as a standalone
-# Docker service. The server exposes /health, /run and /runsync in addition
-# to the regular /audit, /lighthouse, /screenshot and /diagnostic routes.
+# RunPod's Python SDK (handler.py) handles the job queue and forwards each job
+# to the Node.js Express server running inside the same container. The Node.js
+# server exposes /health, /run and the regular /audit, /lighthouse, /screenshot
+# routes.
 FROM node:20-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install dependencies and Google Chrome (more reliable than bundled Chromium)
+# Install Python + pip so we can run the RunPod SDK wrapper, plus the system
+# dependencies needed by Google Chrome.
 RUN apt-get update && apt-get install -y \
     curl \
     gnupg \
@@ -30,6 +31,8 @@ RUN apt-get update && apt-get install -y \
     libxrandr2 \
     xdg-utils \
     libgbm1 \
+    python3 \
+    python3-pip \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
@@ -44,6 +47,7 @@ ENV NODE_ENV=production
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
 
 # Install dumb-init for proper signal handling and zombie reaping
 RUN apt-get update && apt-get install -y dumb-init && rm -rf /var/lib/apt/lists/*
@@ -52,26 +56,28 @@ RUN apt-get update && apt-get install -y dumb-init && rm -rf /var/lib/apt/lists/
 RUN google-chrome-stable --version && \
     ls -la /usr/bin/google-chrome-stable
 
-# Copy package files
+# Copy package files and build the Node.js app
 COPY package*.json ./
 COPY tsconfig.json ./
-
-# Install dependencies (include dev so we can build TypeScript)
 RUN npm install --include=dev
-
-# Copy source code
 COPY . .
-
-# Build TypeScript
 RUN npm run build
-
-# Remove devDependencies for production
 RUN npm prune --production
 
-# Expose the port the service listens on. In RunPod you must configure the
-# endpoint to route traffic to this same port (default 8080).
+# Install RunPod Python SDK
+COPY requirements-runpod.txt ./
+RUN python3 -m pip install --no-cache-dir --upgrade pip && \
+    python3 -m pip install --no-cache-dir -r requirements-runpod.txt
+
+# Sanity check: confirm runpod SDK and Node.js server are present
+RUN python3 -c "import runpod, requests; print('runpod', runpod.__version__ if hasattr(runpod, '__version__') else 'installed')" && \
+    node -e "console.log('node', process.version)" && \
+    ls -la dist/index.js
+
+# Expose the port the Node.js server listens on. RunPod does not need this
+# exposed for queue-based workers, but it is useful for local testing.
 EXPOSE 8080
 
-# Start the app with dumb-init for proper signal handling
+# Start the RunPod SDK handler, which in turn starts the Node.js server.
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["node", "dist/index.js"]
+CMD ["python3", "-u", "handler.py"]

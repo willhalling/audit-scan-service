@@ -4,9 +4,10 @@ A standalone Node.js service for handling heavy website scanning operations
 including Lighthouse performance audits, comprehensive website scraping,
 accessibility scanning, screenshot capture, and OpenAI-powered content analysis.
 
-This service is designed to run as a **RunPod Serverless** endpoint (custom HTTP
-container). It also works as a standalone Docker container or local Express
-server.
+This service is designed to run as a **RunPod Serverless** endpoint. A thin
+Python handler (`handler.py`) uses the official RunPod SDK to receive jobs and
+forwards them to the Node.js Express server running inside the same container.
+It also works as a standalone Docker container or local Express server.
 
 ## Overview
 
@@ -24,10 +25,11 @@ heavy, long-running work:
 ```
 Next.js App (Vercel)          RunPod Serverless          Firebase
 ─────────────────────         ───────────────────        ──────────
-POST /run                         POST /run               audits/{auditId}
-{ action: "startAudit" }    ──▶   start background audit  pages[]
-                                  upload screenshots        screenshots
-                                  run Lighthouse            status
+POST /run                         handler.py              audits/{auditId}
+{ action: "startAudit" }    ──▶   forwards to Node.js     pages[]
+                                  start background audit  screenshots
+                                  upload screenshots        status
+                                  run Lighthouse
                                   run axe-core
                                   run AI analysis
 ```
