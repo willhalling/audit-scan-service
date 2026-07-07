@@ -14,18 +14,11 @@ to get the completed `AuditResult`.
 
 ## Image registry
 
-The default setup uses **GitHub Container Registry (ghcr.io)** because it is
-free for both public and private images and uses your existing GitHub account.
-
-Your image will be:
+The image is published to Docker Hub:
 
 ```
-ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1
+wavecanvas/scan-service:vN
 ```
-
-If you prefer **Docker Hub**, replace `ghcr.io/YOUR_GITHUB_USERNAME/scan-service`
-with `yourdockerhubuser/scan-service` everywhere below. Note that Docker Hub’s
-free plan only includes one private repo; public repos are free and unlimited.
 
 ---
 
@@ -75,33 +68,34 @@ The repo includes `.github/workflows/docker-publish.yml`. On every push to
 
 1. Compute the next `vN` git tag.
 2. Build the Docker image.
-3. Push `ghcr.io/YOUR_GITHUB_USERNAME/scan-service:vN` and `:latest`.
+3. Push `wavecanvas/scan-service:vN` and `:latest` to Docker Hub.
 
-You do **not** need to create any Docker Hub credentials. The workflow uses
-`GITHUB_TOKEN` automatically.
+Before using it:
+
+- Add `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` as repository secrets in
+  GitHub.
+- Make sure `DOCKERHUB_USERNAME` matches the Docker Hub namespace, e.g.
+  `wavecanvas`.
 
 After the action runs, update your RunPod endpoint to point at the new
 versioned tag, e.g.:
 
 ```
-ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v2
+wavecanvas/scan-service:v2
 ```
 
-### Option B: Manual build/push to ghcr.io
+### Option B: Manual build/push
 
 ```bash
 # Build
-docker build -t ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1 .
+docker build -t wavecanvas/scan-service:v1 .
 
-# Log in to ghcr.io (uses your GitHub username and a Personal Access Token)
-docker login ghcr.io -u YOUR_GITHUB_USERNAME
-
-# Push
-docker push ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1
+# Push (make sure you are logged in with `docker login`)
+docker push wavecanvas/scan-service:v1
 ```
 
 Then in RunPod edit the endpoint and set the image to
-`ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1`.
+`wavecanvas/scan-service:v1`.
 
 > **Tip:** Always use a versioned tag (`:v1`, `:v2`) instead of `:latest` when
 > updating the RunPod endpoint. Changing the tag is what guarantees RunPod
@@ -204,7 +198,7 @@ your GitHub repo, it is usually one of these:
    **GitHub Repository**:
    - Build and push the Docker image manually or via GitHub Actions.
    - In RunPod choose **New Endpoint → Custom Template**.
-   - Set the image to `ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1`.
+   - Set the image to `wavecanvas/scan-service:v1`.
    - Set the container port to `8080`.
    - Add the environment variables above.
    - Save. This path does not require RunPod to scan the repo for a handler.
