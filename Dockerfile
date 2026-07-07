@@ -64,10 +64,12 @@ COPY . .
 RUN npm run build
 RUN npm prune --production
 
-# Install RunPod Python SDK
+# Install RunPod Python SDK. --break-system-packages is required because
+# node:20-slim is based on Debian 12, which marks the system Python as
+# externally managed. Inside an isolated Docker container this is safe.
 COPY requirements-runpod.txt ./
-RUN python3 -m pip install --no-cache-dir --upgrade pip && \
-    python3 -m pip install --no-cache-dir -r requirements-runpod.txt
+RUN python3 -m pip install --no-cache-dir --break-system-packages --upgrade pip && \
+    python3 -m pip install --no-cache-dir --break-system-packages -r requirements-runpod.txt
 
 # Sanity check: confirm runpod SDK and Node.js server are present
 RUN python3 -c "import runpod, requests; print('runpod', runpod.__version__ if hasattr(runpod, '__version__') else 'installed')" && \
