@@ -12,6 +12,23 @@ to get the completed `AuditResult`.
 
 ---
 
+## Image registry
+
+The default setup uses **GitHub Container Registry (ghcr.io)** because it is
+free for both public and private images and uses your existing GitHub account.
+
+Your image will be:
+
+```
+ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1
+```
+
+If you prefer **Docker Hub**, replace `ghcr.io/YOUR_GITHUB_USERNAME/scan-service`
+with `yourdockerhubuser/scan-service` everywhere below. Note that Docker Hub’s
+free plan only includes one private repo; public repos are free and unlimited.
+
+---
+
 ## 1. What you need to set up in RunPod
 
 If you haven't created a RunPod Serverless endpoint yet:
@@ -58,30 +75,33 @@ The repo includes `.github/workflows/docker-publish.yml`. On every push to
 
 1. Compute the next `vN` git tag.
 2. Build the Docker image.
-3. Push `yourdockeruser/scan-service:vN` and `:latest` to Docker Hub.
+3. Push `ghcr.io/YOUR_GITHUB_USERNAME/scan-service:vN` and `:latest`.
 
-Before using it:
-
-- Replace `yourdockeruser/scan-service` in the workflow with your Docker Hub
-  username/image name.
-- Add `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN` as repository secrets in
-  GitHub.
+You do **not** need to create any Docker Hub credentials. The workflow uses
+`GITHUB_TOKEN` automatically.
 
 After the action runs, update your RunPod endpoint to point at the new
-versioned tag (e.g. `yourdockeruser/scan-service:v2`).
+versioned tag, e.g.:
 
-### Option B: Manual build/push
+```
+ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v2
+```
+
+### Option B: Manual build/push to ghcr.io
 
 ```bash
 # Build
-docker build -t yourdockeruser/scan-service:v1 .
+docker build -t ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1 .
 
-# Push (make sure you are logged in with `docker login`)
-docker push yourdockeruser/scan-service:v1
+# Log in to ghcr.io (uses your GitHub username and a Personal Access Token)
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+
+# Push
+docker push ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1
 ```
 
 Then in RunPod edit the endpoint and set the image to
-`yourdockeruser/scan-service:v1`.
+`ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1`.
 
 > **Tip:** Always use a versioned tag (`:v1`, `:v2`) instead of `:latest` when
 > updating the RunPod endpoint. Changing the tag is what guarantees RunPod
@@ -164,5 +184,30 @@ Or test the Python handler directly:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-runpod.txt
-python3 handler.py
+python3 test_handler.py
 ```
+
+---
+
+## 7. Troubleshooting: "Could not find runpod.serverless.start()"
+
+If RunPod still reports it cannot find `runpod.serverless.start()` when linking
+your GitHub repo, it is usually one of these:
+
+1. **GitHub indexing delay** — the error message itself says this. Wait 2–3
+   minutes after pushing, then click **Refresh** in RunPod.
+2. **Wrong branch** — make sure RunPod is pointing at the branch that contains
+   `handler.py` (usually `main`).
+3. **RunPod auto-detects a Node.js repo** — because this repo contains
+   `package.json`, RunPod may classify it as a Node project and skip Python
+   handler scanning. If this happens, use **Custom Template** instead of
+   **GitHub Repository**:
+   - Build and push the Docker image manually or via GitHub Actions.
+   - In RunPod choose **New Endpoint → Custom Template**.
+   - Set the image to `ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1`.
+   - Set the container port to `8080`.
+   - Add the environment variables above.
+   - Save. This path does not require RunPod to scan the repo for a handler.
+
+The Custom Template route is the most reliable deployment path for a
+mixed-language repo like this one.

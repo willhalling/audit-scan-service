@@ -165,15 +165,18 @@ See [`RUNPOD_DEPLOY.md`](./RUNPOD_DEPLOY.md) for full instructions, including:
 
 Quick summary:
 
-1. Build and push the Docker image:
+1. Build and push the Docker image. The default workflow pushes to GitHub
+   Container Registry (ghcr.io), which is free for public and private images:
 
 ```bash
-docker build -t yourdockeruser/scan-service:v1 .
-docker push yourdockeruser/scan-service:v1
+docker build -t ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1 .
+docker login ghcr.io -u YOUR_GITHUB_USERNAME
+docker push ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1
 ```
 
-2. In RunPod, create a Serverless Endpoint using that image, set the container
-   port to `8080`, and add the environment variables from `.env.example`.
+2. In RunPod, create a Serverless Endpoint using that image
+   (`ghcr.io/YOUR_GITHUB_USERNAME/scan-service:v1`), set the container port to
+   `8080`, and add the environment variables from `.env.example`.
 
 3. Send a test request:
 
