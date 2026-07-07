@@ -1,8 +1,11 @@
 import { getStorage } from 'firebase-admin/storage';
+import { getApp } from 'firebase-admin/app';
 
 export class StorageService {
   private static getBucket() {
-    const bucketName = 'audit-widget.firebasestorage.app';
+    // Allow explicit override, otherwise derive from the initialized Firebase app.
+    const bucketName = process.env.FIREBASE_STORAGE_BUCKET ||
+      `${getApp().options.projectId}.firebasestorage.app`;
     console.log(`Using storage bucket: ${bucketName}`);
     return getStorage().bucket(bucketName);
   }
