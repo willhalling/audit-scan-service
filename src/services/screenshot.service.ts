@@ -226,4 +226,37 @@ export class ScreenshotService {
       desktopUrl // Only return cover page screenshot
     };
   }
+
+  /**
+   * Capture plain desktop and mobile screenshots of a page and upload them to
+   * Firebase Storage. Used by the lightweight audit flow (no annotations).
+   */
+  static async takePlainScreenshots(
+    url: string,
+    auditId: string,
+    host: string
+  ): Promise<{ desktopUrl: string; mobileUrl: string }> {
+    console.log(`📸 Taking plain screenshots for ${url}`);
+
+    const [desktopBuffer, mobileBuffer] = await Promise.all([
+      this.takeScreenshot({
+        url,
+        viewport: { width: 1366, height: 850 },
+        fullPage: false
+      }),
+      this.takeScreenshot({
+        url,
+        viewport: { width: 375, height: 667 },
+        fullPage: false
+      })
+    ]);
+
+    const [desktopUrl, mobileUrl] = await Promise.all([
+      StorageService.uploadScreenshot(desktopBuffer, auditId, 'desktop', host),
+      StorageService.uploadScreenshot(mobileBuffer, auditId, 'mobile', host)
+    ]);
+
+    console.log(`✅ Plain screenshots uploaded: desktop=${desktopUrl}, mobile=${mobileUrl}`);
+    return { desktopUrl, mobileUrl };
+  }
 }

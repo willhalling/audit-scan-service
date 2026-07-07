@@ -1,6 +1,6 @@
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { AuditResult, PageData } from '../types/index.js';
+import { AuditResult, PageData, ModernSite } from '../types/index.js';
 
 // Minimal service-account fields required by firebase-admin.
 // We reconstruct the certificate from env vars so you don't have to paste the
@@ -142,6 +142,11 @@ class FirebaseService {
     await this.db.collection('audits').doc(auditId).update(updateData);
   }
 
+  async updateAuditModernSite(auditId: string, modernSite: ModernSite): Promise<void> {
+    if (!this.db) throw new Error('Firestore is not initialized');
+    await this.db.collection('audits').doc(auditId).update({ modernSite: this.cleanData(modernSite) });
+  }
+
   async updateAuditPages(auditId: string, pages: PageData[]): Promise<void> {
     if (!this.db) throw new Error('Firestore is not initialized');
     const cleanedPages = this.cleanData(pages);
@@ -188,6 +193,10 @@ export const firebaseService = {
   
   async updateAuditStatus(auditId: string, status: any) {
     return this.instance.updateAuditStatus(auditId, status);
+  },
+
+  async updateAuditModernSite(auditId: string, modernSite: ModernSite) {
+    return this.instance.updateAuditModernSite(auditId, modernSite);
   },
   
   async updateAuditPages(auditId: string, pages: any[]) {

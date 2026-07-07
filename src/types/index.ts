@@ -257,14 +257,36 @@ export interface PageData {
   ai?: AIAnalysis;
 }
 
+export interface ModernSite {
+  previewUrl?: string;
+  friendlyId?: string;
+  businessId?: string;
+  desktopUrl?: string;
+  mobileUrl?: string;
+  lighthouseDesktop?: ReducedLighthouseData;
+  lighthouseMobile?: ReducedLighthouseData;
+}
+
 export interface AuditResult {
   auditId: string;
   host: string;
   url: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status:
+    | 'pending'
+    | 'running'
+    | 'analysing'
+    | 'screenshot'
+    | 'performance'
+    | 'accessibility'
+    | 'seo'
+    | 'content'
+    | 'building'
+    | 'completed'
+    | 'failed';
   createdAt: number;
   completedAt?: number;
   pages?: PageData[];
+  modernSite?: ModernSite;
   error?: string;
   authorUid?: string; // Optional author UID associated with the audit
 }
