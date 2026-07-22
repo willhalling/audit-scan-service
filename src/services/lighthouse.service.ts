@@ -1,6 +1,6 @@
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
-import { LighthouseResult, LighthouseOptions } from '../types/index.js';
+import { LighthouseResult, LighthouseOptions, LighthouseOpportunity, ReducedLighthouseData } from '../types/index.js';
 import { PuppeteerConfig } from '../utils/puppeteer-config.js';
 
 export class LighthouseService {
@@ -71,34 +71,68 @@ export class LighthouseService {
     });
   }
 
-  // Extract violations from Lighthouse audits in the same format as accessibility
-  private static extractLighthouseViolations(lhr: any): Array<{ issue: string; suggestion: string; severity: 'critical' | 'serious' | 'moderate' | 'minor' }> {
-    const violations: Array<{ issue: string; suggestion: string; severity: 'critical' | 'serious' | 'moderate' | 'minor' }> = [];
-    
-    if (!lhr.audits) return violations;
-    
-    // Check failed audits that indicate violations
+  // Extract the top performance opportunities from a raw Lighthouse result
+  private static extractOpportunities(lhr: any): LighthouseOpportunity[] {
+    const opportunities: LighthouseOpportunity[] = [];
+
+    if (!lhr.audits) return opportunities;
+
     for (const [auditId, auditData] of Object.entries(lhr.audits as any)) {
       const audit = auditData as any;
-      if (audit.score !== null && audit.score < 1) {
-        const severity = this.mapScoreToSeverity(audit.score);
-        violations.push({
-          issue: audit.title || auditId,
-          suggestion: audit.description || 'See Lighthouse documentation for details',
-          severity
-        });
-      }
+      if (audit.score === null || audit.score === undefined || audit.score >= 1) continue;
+      if (!audit.details || audit.details.overallSavingsMs === undefined) continue;
+
+      const savingsMs = audit.details.overallSavingsMs as number;
+      const severity: LighthouseOpportunity['severity'] =
+        savingsMs >= 1000 ? 'high' : savingsMs >= 300 ? 'medium' : 'low';
+
+      opportunities.push({
+        issue: audit.title || auditId,
+        suggestion: (audit.displayValue
+          ? `${audit.displayValue} potential saving`
+          : audit.description || 'See Lighthouse documentation for details'
+        ).replace(/\s+/g, ' ').slice(0, 200),
+        severity
+      });
     }
-    
-    return violations;
+
+    const severityRank = { high: 0, medium: 1, low: 2 };
+    return opportunities
+      .sort((a, b) => severityRank[a.severity] - severityRank[b.severity])
+      .slice(0, 8);
   }
-  
-  // Map Lighthouse scores to severity levels
-  private static mapScoreToSeverity(score: number): 'critical' | 'serious' | 'moderate' | 'minor' {
-    if (score === 0) return 'critical';
-    if (score < 0.5) return 'serious';
-    if (score < 0.9) return 'moderate';
-    return 'minor';
+
+  /**
+   * Reduce a full LighthouseResult to the trimmed contract shape written to
+   * Firestore (display strings + page-weight data + top opportunities).
+   */
+  static reduce(result: LighthouseResult): ReducedLighthouseData {
+    const audits = result.audits || {};
+    const display = (id: string): string =>
+      audits[id]?.displayValue ||
+      (audits[id]?.numericValue !== undefined ? String(Math.round(audits[id].numericValue)) : '');
+
+    // resource-summary carries per-resource-type transfer sizes + request counts
+    const summaryItems: any[] = audits['resource-summary']?.details?.items || [];
+    const totalRow = summaryItems.find((i) => i.resourceType === 'total') || {};
+    const imageRow = summaryItems.find((i) => i.resourceType === 'image') || {};
+
+    return {
+      performanceScore: Math.round((result.categories.performance?.score || 0) * 100),
+      accessibilityScore: Math.round((result.categories.accessibility?.score || 0) * 100),
+      bestPracticesScore: Math.round((result.categories['best-practices']?.score || 0) * 100),
+      seoScore: Math.round((result.categories.seo?.score || 0) * 100),
+      firstContentfulPaint: display('first-contentful-paint'),
+      largestContentfulPaint: display('largest-contentful-paint'),
+      cumulativeLayoutShift: display('cumulative-layout-shift'),
+      totalBlockingTime: display('total-blocking-time'),
+      speedIndex: display('speed-index'),
+      timeToInteractive: display('interactive'),
+      totalByteWeightKb: Math.round((totalRow.transferSize || 0) / 1024),
+      requestCount: totalRow.requestCount || 0,
+      imageBytesKb: Math.round((imageRow.transferSize || 0) / 1024),
+      opportunities: result.opportunities || []
+    };
   }
 
   static async runLighthouse(config: LighthouseOptions): Promise<LighthouseResult> {
@@ -188,7 +222,10 @@ export class LighthouseService {
           'link-name',
           'meta-description',
           'title',
-          'robots-txt'
+          'robots-txt',
+          'total-byte-weight',
+          'network-requests',
+          'resource-summary'
         ];
 
         for (const key of importantAuditKeys) {
@@ -208,15 +245,27 @@ export class LighthouseService {
           }
         }
 
-        // Extract violations from failed audits
-        const violations = this.extractLighthouseViolations(runnerResult.lhr);
+        // resource-summary details are small (~10 rows) and carry page weight data
+        const resourceSummary: any = runnerResult.lhr.audits['resource-summary'];
+        if (resourceSummary?.details?.items) {
+          essentialAudits['resource-summary'].details = {
+            items: resourceSummary.details.items.map((item: any) => ({
+              resourceType: item.resourceType,
+              transferSize: item.transferSize,
+              requestCount: item.requestCount
+            }))
+          };
+        }
+
+        // Extract top performance opportunities
+        const opportunities = this.extractOpportunities(runnerResult.lhr);
 
         return {
           url: config.url,
           timestamp: new Date().toISOString(),
           categories: runnerResult.lhr.categories,
           audits: essentialAudits, // Only essential audit data
-          violations // Add violations in same format as accessibility
+          opportunities
         };
       } catch (lighthouseError) {
         console.error('❌ Lighthouse execution failed:', lighthouseError);

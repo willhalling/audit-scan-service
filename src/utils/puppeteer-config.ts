@@ -116,19 +116,24 @@ export class PuppeteerConfig {
   }
 
   /**
-   * Kill any leftover Chrome processes before launching new browser
+   * Kill leftover Chrome processes from previous runs.
+   *
+   * IMPORTANT: this must ONLY be called at worker startup and on shutdown.
+   * Calling it while audits are running kills browsers belonging to
+   * in-flight screenshots/sessions (parallel captures used to kill each
+   * other this way).
    */
-  static async forceCleanup(): Promise<void> {
+  static async killStaleChromeProcesses(): Promise<void> {
     try {
-      console.log('🧹 Force cleaning up browser processes...');
-      const { exec } = require('child_process');
-      
+      console.log('🧹 Killing stale browser processes...');
+      const { exec } = await import('child_process');
+
       await new Promise<void>((resolve) => {
         exec('pkill -f "chrome|chromium" || true', () => resolve());
       });
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('🧹 Cleanup complete');
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+      console.log('🧹 Stale browser cleanup complete');
     } catch (error) {
       console.log('⚠️ Some processes could not be killed (this is usually fine)');
     }

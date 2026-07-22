@@ -12,6 +12,7 @@ import { AuditService } from './services/audit.service.js';
 import { LighthouseService } from './services/lighthouse.service.js';
 import { ScreenshotService } from './services/screenshot.service.js';
 import { normalizeUrl, isValidUrl } from './utils/helpers.js';
+import { PuppeteerConfig } from './utils/puppeteer-config.js';
 
 // Make sure we catch and handle all unhandled errors
 process.on('uncaughtException', (error) => {
@@ -22,6 +23,15 @@ process.on('uncaughtException', (error) => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('UNHANDLED REJECTION at:', promise, 'reason:', reason);
 });
+
+// Kill stale Chrome processes ONLY at startup and on shutdown. Never do this
+// mid-run — audits run browsers in parallel and would kill each other.
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    console.log(`Received ${signal}, cleaning up browser processes...`);
+    PuppeteerConfig.killStaleChromeProcesses().finally(() => process.exit(0));
+  });
+}
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -74,9 +84,12 @@ try {
  * RunPod sends jobs as POST requests with a body shaped like:
  *   { "input": { "action": "startAudit", "url": "...", "auditId": "...", ... } }
  *
- * Because website audits can be long-running, the default `startAudit` action
- * starts the work in the background and immediately returns the auditId. The
- * caller can then poll GET /audit/:auditId (or check Firestore) for results.
+ * `startAudit` runs the full audit inline (it can take a couple of minutes —
+ * within RunPod's execution timeout) and returns once finished. The caller
+ * doesn't wait on this response: it listens to Firestore `audits/{auditId}`,
+ * which is updated with partial results after every pipeline step
+ * (analysing → screenshots → performance → accessibility → business → ai →
+ * completed).
  *
  * Supported actions:
  *   - startAudit   -> { auditId }
@@ -257,7 +270,10 @@ try {
     console.log(`🚀 Scan Service running on port ${PORT}`);
     console.log(`Environment: ${process.env.NODE_ENV}`);
     console.log(`Health check available at: http://localhost:${PORT}/health`);
-    
+
+    // Clean up any Chrome processes left behind by a previous worker run
+    PuppeteerConfig.killStaleChromeProcesses().catch(() => {});
+
     // Log server address info for debugging
     const addressInfo = server.address();
     console.log(`Server address info: ${typeof addressInfo === 'string' ? addressInfo : JSON.stringify(addressInfo)}`);

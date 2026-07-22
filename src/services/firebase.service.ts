@@ -1,6 +1,6 @@
 import { initializeApp, cert, getApps, App } from 'firebase-admin/app';
 import { getFirestore, Firestore } from 'firebase-admin/firestore';
-import { AuditResult, PageData, ModernSite } from '../types/index.js';
+import { AuditResult, PageData, AiReport } from '../types/index.js';
 
 // Minimal service-account fields required by firebase-admin.
 // We reconstruct the certificate from env vars so you don't have to paste the
@@ -142,9 +142,22 @@ class FirebaseService {
     await this.db.collection('audits').doc(auditId).update(updateData);
   }
 
-  async updateAuditModernSite(auditId: string, modernSite: ModernSite): Promise<void> {
+  async updateAuditScan(auditId: string, updates: Record<string, unknown>): Promise<void> {
     if (!this.db) throw new Error('Firestore is not initialized');
-    await this.db.collection('audits').doc(auditId).update({ modernSite: this.cleanData(modernSite) });
+    // Dot-path updates so partial scan results can be written after each step
+    // without clobbering fields written by earlier steps.
+    const flattened: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(updates)) {
+      flattened[`scan.${key}`] = this.cleanData(value);
+    }
+    await this.db.collection('audits').doc(auditId).update(flattened);
+  }
+
+  async updateAuditAiReport(auditId: string, aiReport: AiReport): Promise<void> {
+    if (!this.db) throw new Error('Firestore is not initialized');
+    await this.db.collection('audits').doc(auditId).update({
+      aiReport: this.cleanData(aiReport)
+    });
   }
 
   async updateAuditPages(auditId: string, pages: PageData[]): Promise<void> {
@@ -195,8 +208,12 @@ export const firebaseService = {
     return this.instance.updateAuditStatus(auditId, status);
   },
 
-  async updateAuditModernSite(auditId: string, modernSite: ModernSite) {
-    return this.instance.updateAuditModernSite(auditId, modernSite);
+  async updateAuditScan(auditId: string, updates: Record<string, unknown>) {
+    return this.instance.updateAuditScan(auditId, updates);
+  },
+
+  async updateAuditAiReport(auditId: string, aiReport: AiReport) {
+    return this.instance.updateAuditAiReport(auditId, aiReport);
   },
   
   async updateAuditPages(auditId: string, pages: any[]) {

@@ -1,3 +1,8 @@
+// ---------------------------------------------------------------------------
+// Shared contract with the managedsites consumer repo — field names must
+// match verbatim (see plans/blue-beetle-ice-fantomex.md).
+// ---------------------------------------------------------------------------
+
 export interface LighthouseOptions {
   url: string;
   useDesktop?: boolean;
@@ -9,99 +14,13 @@ export interface LighthouseResult {
   timestamp: string;
   categories: any;
   audits: any;
-  violations?: Array<{
-    issue: string;
-    suggestion: string;
-    severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  }>;
+  opportunities?: LighthouseOpportunity[];
 }
 
-export interface ScrapeResult {
-  url: string;
-  title: string;
-  description: string;
-  headings: {
-    h1: string[];
-    h2: string[];
-    h3: string[];
-  };
-  links: string[];
-  images: string[];
-  ctas: string[];
-  wordCount: number;
-  forms: FormInfo[];
-  socialLinks: SocialPlatforms;
-  brokenLinks: {
-    broken: string[];
-    valid: string[];
-    brokenExamples: string[];
-  };
-  pageCount: number;
-  contentAnalysis: ContentAnalysis;
-  wordCloudData: WordCloudData[];
-}
-
-export interface WordCloudData {
-  text: string;
-  size: number;
-}
-
-export interface FormInfo {
-  inputs: number;
-  requiredFields: number;
-  buttons: number;
-}
-
-export interface SocialPlatforms {
-  x: boolean;
-  facebook: boolean;
-  linkedin: boolean;
-  instagram: boolean;
-  tiktok: boolean;
-  youtube: boolean;
-  pinterest: boolean;
-  missingSocials: string[];
-}
-
-export interface ContentAnalysis {
-  wordCount: number;
-  readabilityScore: number;
-  keywordDensity: { [key: string]: number };
-  sentimentScore: number;
-}
-
-export interface AccessibilityViolation {
-  id: string;
-  impact: 'minor' | 'moderate' | 'serious' | 'critical';
-  tags: string[];
-  description: string;
-  help: string;
-  helpUrl: string;
-  nodes: {
-    target: string[];
-    html: string;
-    failureSummary: string;
-  }[];
-}
-
-export interface AccessibilityResult {
-  url: string;
-  timestamp: string;
-  violations: AccessibilityViolation[];
-  passes: any[];
-  incomplete: any[];
-  inapplicable: any[];
-  score: AccessibilityScore;
-}
-
-export interface AccessibilityScore {
-  totalViolations: number;
-  criticalCount: number;
-  seriousCount: number;
-  moderateCount: number;
-  minorCount: number;
-  passCount: number;
-  score: number;
+export interface LighthouseOpportunity {
+  issue: string;
+  suggestion: string;
+  severity: 'high' | 'medium' | 'low';
 }
 
 export interface ScreenshotOptions {
@@ -114,207 +33,229 @@ export interface ScreenshotOptions {
   hideSelectors?: string[]; // Array of selectors to hide before screenshot
 }
 
-export interface ElementCoordinate {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  impact: 'minor' | 'moderate' | 'serious' | 'critical';
-}
-
-export interface AIAnalysisSection {
-  analysis: string;
-  suggestions: string;
-}
-
-export interface AIAnalysis {
-  meta: {
-    title: AIAnalysisSection;
-    description: AIAnalysisSection;
-  };
-  content: {
-    heading: AIAnalysisSection;
-    cta: AIAnalysisSection;
-    tone: AIAnalysisSection;
-    readability: AIAnalysisSection;
-    intent: AIAnalysisSection;
-  };
-}
-
 export interface AuditRequest {
   url: string;
-  pages?: string[]; // Array of up to 5 page paths (e.g. ['/about', '/contact'])
+  pages?: string[]; // Array of page paths (currently only the main page is scanned)
   authorUid?: string; // Optional author UID to associate with the audit
   enableAI?: boolean; // Optional flag to enable/disable AI analysis (default: true)
 }
 
-export interface PageMeta {
-  title: string;
-  description: string;
-  keywords?: string[];
-  language: string;
-  charset?: string;
-  viewport?: string;
-  canonical: string;
+export type AuditStatus =
+  | 'pending'
+  | 'analysing'
+  | 'screenshots'
+  | 'performance'
+  | 'accessibility'
+  | 'business'
+  | 'ai'
+  | 'completed'
+  | 'failed';
+
+// ---------------------------------------------------------------------------
+// Screenshots
+// ---------------------------------------------------------------------------
+
+export interface AuditScreenshots {
+  mobileFoldUrl?: string;
+  desktopFoldUrl?: string;
+  mobileFullUrl?: string;
+  desktopFullUrl?: string;
 }
 
-export interface PageHeaders {
-  h1: string;
-  h2: string[];
-  h3: string[];
-  h4: string[];
-  h5: string[];
-  h6: string[];
-}
-
-export interface PageScreenshots {
+// PageData.screenshots keeps desktopUrl/mobileUrl (fold shots) for backward
+// compatibility and adds the four named URLs.
+export interface PageScreenshots extends AuditScreenshots {
   desktopUrl?: string;
-  annotatedDesktopUrl?: string;
-  annotatedMobileUrl?: string;
   mobileUrl?: string;
 }
 
-export interface SocialAnalysis {
-  x: boolean;
-  facebook: boolean;
-  linkedin: boolean;
-  instagram: boolean;
-  tiktok: boolean;
-  youtube: boolean;
-  pinterest: boolean;
-  missingSocials: string[];
+// ---------------------------------------------------------------------------
+// Performance (reduced Lighthouse)
+// ---------------------------------------------------------------------------
+
+export interface ReducedLighthouseData {
+  performanceScore: number;
+  accessibilityScore: number;
+  bestPracticesScore: number;
+  seoScore: number;
+  firstContentfulPaint: string;
+  largestContentfulPaint: string;
+  cumulativeLayoutShift: string;
+  totalBlockingTime: string;
+  speedIndex: string;
+  timeToInteractive: string;
+  totalByteWeightKb: number;
+  requestCount: number;
+  imageBytesKb: number;
+  opportunities: LighthouseOpportunity[];
 }
 
-export interface PageAccessibilityData {
-  summary?: {
-    score: number;
-    totalViolations: number;
-    passCount: number;
-    criticalCount: number;
-    seriousCount: number;
-    moderateCount: number;
-    minorCount: number;
-  };
-  violations?: Array<{
-    id: string;
-    impact: 'minor' | 'moderate' | 'serious' | 'critical';
-    description: string;
-    help: string;
-    helpUrl: string;
-    tags: string[];
-    nodes: Array<{
-      html: string;
-      target: string[];
-    }>;
-  }>;
+// ---------------------------------------------------------------------------
+// Page data (backward-compatible entry kept on audits/{id}.pages)
+// ---------------------------------------------------------------------------
+
+export interface PageMeta {
+  title: string;
+  description: string;
+  language: string;
+  viewport?: string;
+  canonical: string;
 }
 
 export interface PageData {
   url: string;
   pagePath: string;
   meta: PageMeta;
-  isRobotsDoFollow: boolean;
-  hasViewportMetaTag: boolean;
-  canonical: string;
-  ctas: string[];
-  bodyText: string;
-  textToHtmlRatio: number;
-  headers: PageHeaders;
-  hasSingleH1: boolean;
   screenshots: PageScreenshots;
-  wordCount?: number;
-  socialAnalysis?: SocialAnalysis;
-  accessibility?: {
-    missingAltCount: number;
-    totalImages: number;
-    missingAltExamples: string[];
-  };
-  security?: {
-    mixedContent: boolean;
-  };
-  brokenLinks?: string[];
-  brokenLinkExamples?: string[];
-  forms?: Array<{
-    inputs: number;
-    requiredFields: number;
-    buttons: number;
-  }>;
-  issues?: Array<{
-    issue: string;
-    suggestion: string;
-    severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  }>;
-  suggestions?: Array<{
-    issue: string;
-    suggestion: string;
-    severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  }>;
-  lighthouseDesktop?: ReducedLighthouseData;
   lighthouseMobile?: ReducedLighthouseData;
-  accessibilityDesktop?: { violations: ReducedAccessibilityViolation[] };
-  accessibilityMobile?: { violations: ReducedAccessibilityViolation[] };
-  wordCloudData?: WordCloudData[];
-  ai?: AIAnalysis;
+  lighthouseDesktop?: ReducedLighthouseData;
 }
 
-export interface ModernSite {
-  previewUrl?: string;
-  friendlyId?: string;
-  businessId?: string;
-  desktopUrl?: string;
-  mobileUrl?: string;
-  lighthouseDesktop?: ReducedLighthouseData;
-  lighthouseMobile?: ReducedLighthouseData;
+// ---------------------------------------------------------------------------
+// Scan package (audits/{id}.scan)
+// ---------------------------------------------------------------------------
+
+export interface ScanPackage {
+  website: {
+    url: string;
+    host: string;
+    finalUrl: string;
+    title?: string;
+    description?: string;
+    canonical?: string;
+    faviconUrl?: string;
+    language?: string;
+  };
+  pages: string[];
+  screenshots: AuditScreenshots;
+  performance: {
+    mobile: ReducedLighthouseData;
+    desktop?: ReducedLighthouseData;
+  };
+  accessibility: {
+    violations: {
+      id: string;
+      impact: string;
+      description: string;
+      help: string;
+      nodes: string[];
+    }[];
+    violationCount: number;
+    missingAltCount: number;
+    missingFormLabelCount: number;
+    contrastIssueCount: number;
+    headingOrderIssues: string[];
+    ariaIssueCount: number;
+    keyboardIssueCount: number;
+  };
+  seo: {
+    title?: string;
+    description?: string;
+    canonical?: string;
+    openGraph: Record<string, string>;
+    robotsNoindex: boolean;
+    structuredDataTypes: string[];
+    hasSingleH1: boolean;
+  };
+  business: {
+    phones: string[];
+    emails: string[];
+    whatsappLinks: string[];
+    bookingLinks: string[];
+    socialLinks: { platform: string; url: string }[];
+    googleMaps: string[];
+    openingHours?: string[];
+    serviceAreas?: string[];
+    ratingValue?: number;
+    reviewCount?: number;
+    hasReviews: boolean;
+    hasTestimonials: boolean;
+    awards: string[];
+    certifications: string[];
+    accreditations: string[];
+    guarantees: string[];
+  };
+  mobile: {
+    viewportMeta?: string;
+    viewportConfigured: boolean;
+    horizontalOverflow: boolean;
+    smallTapTargets: { count: number; examples: string[] };
+    smallFontSizes: { count: number; examples: string[] };
+    stickyElements: { count: number; examples: string[] };
+    ctaAboveFold: boolean;
+    ctaTexts: string[];
+    heroDetected: boolean;
+    heroText?: string;
+    trustSignalsAboveFold: string[];
+    contactInfoAboveFold: { phone: boolean; email: boolean };
+    pageHeightViewports: number;
+    lazyLoadedImages: number;
+  };
+  desktop: {
+    viewportWidth: number;
+    viewportHeight: number;
+  };
+  extractedContent: {
+    headings: { level: number; text: string }[];
+    ctas: string[];
+    buttons: string[];
+    forms: { action?: string; fieldCount: number; hasLabels: boolean }[];
+    internalLinkCount: number;
+    externalLinkCount: number;
+    internalLinks: string[];
+    externalLinks: string[];
+    imageCount: number;
+    imagesMissingAlt: number;
+    images: { src: string; alt?: string }[];
+    bodyText: string;
+    wordCount: number;
+    fonts: string[];
+    colorPalette: string[];
+  };
+  structuredData: unknown[];
 }
+
+// ---------------------------------------------------------------------------
+// AI report (audits/{id}.aiReport)
+// ---------------------------------------------------------------------------
+
+export interface AiReport {
+  score: number; // 0-100
+  summary: string;
+  firstImpression: string;
+  categories: {
+    trust: { score: number; verdict: string };
+    mobile: { score: number; verdict: string };
+    enquiries: { score: number; verdict: string };
+    appearance: { score: number; verdict: string };
+    content: { score: number; verdict: string };
+  };
+  strengths: string[];
+  improvements: {
+    title: string;
+    why: string;
+    recommendation: string;
+    impact: 'high' | 'medium' | 'low';
+  }[];
+  quickWins: string[];
+  model: string;
+  generatedAt: string; // ISO
+}
+
+// ---------------------------------------------------------------------------
+// Firestore document shape (audits/{auditId})
+// ---------------------------------------------------------------------------
 
 export interface AuditResult {
   auditId: string;
   host: string;
   url: string;
-  status:
-    | 'pending'
-    | 'running'
-    | 'analysing'
-    | 'screenshot'
-    | 'performance'
-    | 'accessibility'
-    | 'seo'
-    | 'content'
-    | 'building'
-    | 'completed'
-    | 'failed';
+  status: AuditStatus;
   createdAt: number;
   completedAt?: number;
   pages?: PageData[];
-  modernSite?: ModernSite;
+  scan?: ScanPackage;
+  aiReport?: AiReport;
   error?: string;
   authorUid?: string; // Optional author UID associated with the audit
-}
-
-// Only the fields to save for each violation
-export interface ReducedAccessibilityViolation {
-  id: string;
-  issue: string;
-  suggestion: string;
-  severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  isVisual: boolean; // Whether this violation appears in annotations
-}
-
-// Only the fields to save for Lighthouse
-export interface ReducedLighthouseData {
-  performance: number;
-  accessibility: number;
-  bestPractices: number;
-  seo: number;
-  firstContentfulPaint: number;
-  largestContentfulPaint: number;
-  cumulativeLayoutShift: number;
-  totalBlockingTime: number;
-  speedIndex: number;
-  interactionToNextPaint?: number;
-  violations?: Array<{
-    issue: string;
-    suggestion: string;
-    severity: 'critical' | 'serious' | 'moderate' | 'minor';
-  }>;
 }

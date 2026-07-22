@@ -10,36 +10,37 @@ export class StorageService {
     return getStorage().bucket(bucketName);
   }
 
+  /**
+   * Upload an audit screenshot (JPEG) to
+   * screenshots/{host}/{auditId}-{type}.jpg and return its public URL.
+   */
   static async uploadScreenshot(
-    buffer: Buffer, 
-    auditId: string, 
-    type: 'desktop' | 'mobile' | 'annotated-desktop' | 'annotated-mobile',
-    host: string
+    buffer: Buffer,
+    host: string,
+    auditId: string,
+    type: 'mobile-fold' | 'desktop-fold' | 'mobile-full' | 'desktop-full'
   ): Promise<string> {
     try {
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const filename = `${auditId}-${type}-${timestamp}.png`;
-      const storagePath = `screenshots/${host.replace(/[^a-zA-Z0-9]/g, '-')}/${filename}`;
-      
+      const storagePath = `screenshots/${host}/${auditId}-${type}.jpg`;
+
       const bucket = this.getBucket();
       const file = bucket.file(storagePath);
-      
+
       console.log(`Uploading screenshot to: gs://${bucket.name}/${storagePath}`);
-      
+
       await file.save(buffer, {
         metadata: {
-          contentType: 'image/png',
+          contentType: 'image/jpeg',
           metadata: {
             auditId,
-            type,
-            timestamp
+            type
           }
         }
       });
 
       // Make file publicly accessible
       await file.makePublic();
-      
+
       // Return public URL
       return `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
     } catch (error) {
